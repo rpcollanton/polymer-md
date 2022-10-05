@@ -2,6 +2,7 @@ import gsd.hoomd
 import gsd.pygsd
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 # utility functions
 def read_traj_from_gsd(fname):
@@ -39,6 +40,22 @@ def binned_density_ND(coord, box, N, nBins):
     h = (h[0] / binvol, h[1])
 
     return h
+
+def count_to_volfrac(hists):
+
+    # takes a dict of numpy histograms, assumed to each be a count of a different species with the same bins,
+    # and converts them to volume fractions such that the sum of each histogram sums to 1 at each bin. 
+    # Note: only using np histograms for convenience, these are not proper histograms once they've been rescaled
+    # differently at each bin like this!! 
+
+    types = list(hists.keys())
+    totcount = np.zeros_like(hists[types[0]][0])
+    for hist in hists.values():
+        totcount += hist[0]
+    for type,hist in hists.items():
+        hists[type] = (hists[type][0]/totcount, hists[type][1])
+
+    return hists    
 
 def integral_ND(dat, x, N):
 
@@ -95,13 +112,16 @@ def density_profile_1D(f, nBins=100, axis=0):
         coords = particleCoord[mask,:]
         hists[type] = binned_density_1D(coords, box, axis, nBins)
 
+    # modify histograms so that sum over species in each bin is 1. IE: convert to vol frac
+    hists = count_to_volfrac(hists)
+
     return hists
 
-def overlap_integral(f, nBins=None):
+def volfrac_fields(f, nBins=None):
 
     if isinstance(f, gsd.hoomd.HOOMDTrajectory):
         ts = [f[i].configuration.step for i in range(len(f))]
-        func = lambda t: overlap_integral(t, nBins=nBins) # to pass non-iterable argument
+        func = lambda t: volfrac_fields(t, nBins=nBins) # to pass non-iterable argument
         return ts, list(map(func, f))
 
     # f is a frame of a trajectory (a snapshot)
@@ -109,7 +129,6 @@ def overlap_integral(f, nBins=None):
     particleCoord = f.particles.position
     particleTypeID = f.particles.typeid
     types = f.particles.types
-    nTypes = len(types)
 
     if nBins == None:
         # determine number of bins based on number of particles
@@ -123,48 +142,48 @@ def overlap_integral(f, nBins=None):
         coords = particleCoord[mask,:]
         hists[type] = binned_density_ND(coords, box, N=3, nBins=nBins)
 
+    # convert to "volume fractions"
+    volfracs = count_to_volfrac(hists)
+
+    return volfracs
+
+def exchange_average(f, nBins=None):
+
+    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+        ts = [f[i].configuration.step for i in range(len(f))]
+        func = lambda t: exchange_average(t, nBins=nBins) # to pass non-iterable argument
+        return ts, list(map(func, f))
+
+    # f is a frame of a trajectory (a snapshot)
+    volfracs = volfrac_fields(f, nBins)
+
+    # Specific to an A-B System! Exchange field, psi order parameter in Kremer/Grest 1996
+    exchange = volfracs['A'][0] - volfracs['B'][0]
+    
+    # Take average of absolute value of exchange field
+    avg_exchange = np.mean(np.absolute(exchange))
+
+    return avg_exchange
+
+def overlap_integral(f, nBins=None):
+
+    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+        ts = [f[i].configuration.step for i in range(len(f))]
+        func = lambda t: overlap_integral(t, nBins=nBins) # to pass non-iterable argument
+        return ts, list(map(func, f))
+
+    # f is a frame of a trajectory (a snapshot)
+    volfracs = volfrac_fields(f, nBins)
+    types = list(volfracs.keys())
+    nTypes = len(types)
+
     # for each function, compute overlap integral.  
-    x = hists[types[0]][1] # get coordinates of samples. Should be same for different particle types in same frame with same number of bins
+    x = volfracs[types[0]][1] # get coordinates of samples. Should be same for different particle types in same frame with same number of bins
     overlaps = np.zeros((nTypes,nTypes))
     for i in range(nTypes):
         for j in range(i, nTypes):
-            dat = np.multiply(hists[types[i]][0], hists[types[j]][0])
+            dat = np.multiply(volfracs[types[i]][0], volfracs[types[j]][0])
             overlaps[i,j] = integral_ND( dat, x, N=3 )
             overlaps[j,i] = overlaps[i,j]
 
     return overlaps
-
-
-#############################################
-# SCRIPT FOR TESTING, WILL BE DELETED LATER #
-#############################################
-
-t = read_traj_from_gsd("/Users/ryancollanton/Desktop/macrosep.npt.NA_0032_NB_0032_MA_0256_MB_0256.gsd")
-
-profiles = density_profile_1D(t[0], nBins=50)
-fig, ax = plt.subplots()
-for type,hist in profiles.items():
-    ax.plot(hist[1][:-1],hist[0],label=type)
-ax.legend()
-fig.savefig("/Users/ryancollanton/Desktop/density_profile.png",dpi=300)
-
-ts, densities = density_system(t)
-fig, ax = plt.subplots()
-ax.plot(ts,densities)
-ax.set_xlabel("Iteration")
-ax.set_ylabel("System Density, N/V")
-fig.savefig("/Users/ryancollanton/Desktop/average_density.png",dpi=300)
-
-ts, overlaps = overlap_integral(t)
-fig, ax = plt.subplots()
-ax.plot(ts,[overlap[0,1] for overlap in overlaps])
-ax.set_xlabel("Iteration")
-ax.set_ylabel("A-B Density Overlap")
-fig.savefig("/Users/ryancollanton/Desktop/overlap_AB.png",dpi=300)
-
-ts, overlaps = overlap_integral(t)
-fig, ax = plt.subplots()
-ax.plot(ts,[overlap[0,1] for overlap in overlaps])
-ax.set_xlabel("Iteration")
-ax.set_ylabel("A-B Density Overlap")
-fig.savefig("/Users/ryancollanton/Desktop/overlap_AB.png",dpi=300)
