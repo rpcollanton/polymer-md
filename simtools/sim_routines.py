@@ -292,6 +292,24 @@ def npt_relaxbox_AB(initial_state, device, epsAB, kT, P, iterations, fstruct=Non
 
     return snap
 
+def nvt_dpd(initial_state, device, aAB, kT, iterations, fstruct=None, ftraj=None):
+
+    # force field parameters
+    dpdParam = {('A','A'): dict(A=25.0, gamma=3.0),
+               ('B','B'): dict(A=25.0, sigma=3.0),
+               ('A','B'): dict(A=aAB, sigma=3.0)}
+    dpd_rcut = 2.5
+    bondParam = dict(k=30.0, r0=1.5, epsilon=0.0, sigma=1.0, delta=0.0)
+    feneParam = {'A-A': bondParam, 'B-B': bondParam}
+
+    # update period
+    period = 5000
+    
+    snap = run_DPD_FENE(initial_state, device, iterations, period, dpdParam, dpd_rcut, feneParam, kT,
+                            fstruct=fstruct, ftraj=ftraj)
+
+    return snap
+
 def run_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=None, ftraj=None):
 
     sim = hoomd.Simulation(device=device, seed=1)
@@ -325,3 +343,36 @@ def run_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, fen
 
     return sim.state.get_snapshot()
 
+def run_DPD_FENE(initial_state, device, iterations, period, dpdParam, dpd_rcut, feneParam, kT, fstruct=None, ftraj=None):
+
+    sim = hoomd.Simulation(device=device, seed=1)
+    sim.create_state_from_snapshot(initial_state)
+
+    # FENE bonded interactions
+    fenewca = hoomd.md.bond.FENEWCA()
+    fenewca.params = feneParam
+
+    # LJ non-bonded interactions
+    nlist = hoomd.md.nlist.Cell(buffer=0.5) # buffer impacts performance, not correctness, with default other settings!
+    dpd = hoomd.md.pair.DPD(nlist, kT=kT, default_r_cut=dpd_rcut) # same cutoff as LJ in simulation
+    dpd.params = dpdParam
+    
+    # integrator
+    nve = hoomd.md.methods.NVE(filter=hoomd.filter.All())
+    integrator = hoomd.md.Integrator(dt=0.005, methods=nve, forces=[fenewca, dpd])
+    sim.operations.integrator = integrator
+
+    if ftraj!=None:
+        # write trajectory
+        sim = __write_trajectory(sim, period, ftraj)
+
+    if fstruct!=None:
+        # write final state
+        sim = __write_state(sim, iterations, fstruct)
+
+    # table logger
+    sim = __table_log(sim, period, writeTiming=True, writeThermo=True)
+    
+    sim.run(iterations)
+
+    return sim.state.get_snapshot()
