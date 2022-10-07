@@ -296,8 +296,8 @@ def nvt_dpd(initial_state, device, aAB, kT, iterations, fstruct=None, ftraj=None
 
     # force field parameters
     dpdParam = {('A','A'): dict(A=25.0, gamma=3.0),
-               ('B','B'): dict(A=25.0, sigma=3.0),
-               ('A','B'): dict(A=aAB, sigma=3.0)}
+               ('B','B'): dict(A=25.0, gamma=3.0),
+               ('A','B'): dict(A=aAB, gamma=3.0)}
     dpd_rcut = 2.5
     bondParam = dict(k=30.0, r0=1.5, epsilon=0.0, sigma=1.0, delta=0.0)
     feneParam = {'A-A': bondParam, 'B-B': bondParam}
