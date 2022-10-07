@@ -91,7 +91,7 @@ def remove_overlaps(initial_state, device, kT, prefactor_range, iterations, fnam
     # gaussian pair potential, similar to KG soft potential when pre-factor multiplied by 2
     # and length scale multiplied by 2/5
     nlist = hoomd.md.nlist.Cell(buffer=0.5) # buffer impacts performance, not correctness, with default other settings!
-    gaussian = hoomd.md.pair.Gauss(nlist, default_r_cut=2.5) # same cutoff as LJ in simulation    
+    gaussian = hoomd.md.pair.Gauss(nlist, default_r_cut=2.5)
 
     # custom ramping of energetic prefactor because parameters don't accept hoomd.variant type
     rampsteps = 100
@@ -135,7 +135,7 @@ def remove_overlaps_AB(initial_state, device, kT, prefactor_range, iterations, f
     # gaussian pair potential, similar to KG soft potential when pre-factor multiplied by 2
     # and length scale multiplied by 2/5
     nlist = hoomd.md.nlist.Cell(buffer=0.5) # buffer impacts performance, not correctness, with default other settings!
-    gaussian = hoomd.md.pair.Gauss(nlist, default_r_cut=2.5) # same cutoff as LJ in simulation    
+    gaussian = hoomd.md.pair.Gauss(nlist, default_r_cut=2.5)
 
     # custom ramping of energetic prefactor because parameters don't accept hoomd.variant type
     rampsteps = 100
@@ -171,7 +171,7 @@ def relax_overlaps(initial_state, device, iterations, fname=None):
 
     # force field parameters
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0)}
-    lj_rcut = 2.5
+    lj_rcut = 2**(1/6)
     feneParam = {'A-A': dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)}
 
     # newtonian NVE dynamics with limit on displacement
@@ -194,7 +194,7 @@ def relax_overlaps_AB(initial_state, device, epsAB, iterations, fname=None):
     sameParam = dict(epsilon=1.0, sigma=1.0)
     diffParam = dict(epsilon=epsAB, sigma=1.0)
     ljParam = {('A','A'): sameParam, ('B','B'): sameParam, ('A','B'): diffParam}
-    lj_rcut = 2.5
+    lj_rcut = 2**(1/6)
     feneParam = {'A-A': dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0),
                  'B-B': dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)}
 
@@ -214,7 +214,7 @@ def equilibrate(initial_state, device, kT, iterations, fstruct, ftraj):
 
     # force field parameters
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0)}
-    lj_rcut = 2.5
+    lj_rcut = 2**(1/6)
     feneParam = {'A-A': dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)}
 
     # langevin thermostat and integrator
@@ -235,7 +235,7 @@ def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct, ftraj)
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
                ('B','B'): dict(epsilon=1.0, sigma=1.0),
                ('A','B'): dict(epsilon=epsAB, sigma=1.0)}
-    lj_rcut = 2.5
+    lj_rcut = 2**(1/6)
     bondParam = dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)
     feneParam = {'A-A': bondParam, 'B-B': bondParam}
 
@@ -255,7 +255,7 @@ def npt_relaxbox(initial_state, device, kT, P, iterations, fstruct=None, ftraj=N
 
     # force field parameters
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0)}
-    lj_rcut = 2.5
+    lj_rcut = 2**(1/6)
     feneParam = {'A-A': dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)}
 
     # langevin thermostat and integrator
@@ -276,7 +276,7 @@ def npt_relaxbox_AB(initial_state, device, epsAB, kT, P, iterations, fstruct=Non
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
                ('B','B'): dict(epsilon=1.0, sigma=1.0),
                ('A','B'): dict(epsilon=epsAB, sigma=1.0)}
-    lj_rcut = 2.5
+    lj_rcut = 2**(1/6)
     bondParam = dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)
     feneParam = {'A-A': bondParam, 'B-B': bondParam}
 
