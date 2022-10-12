@@ -140,8 +140,8 @@ l = 1
 snapshot = read_snapshot_from_gsd(fname)
 newsnapshot = add_linearcopolymer(snapshot, blocktypes, blocklengths, M, l)
 
-newf = "/Users/ryancollanton/Desktop/N_0064_A_0512_B_0512.ABA_20.init.gsd" 
-with gsd.hoomd.open(name=newf, mode='wb') as f:
+fnew = "/Users/ryancollanton/Desktop/N_0064_A_0512_B_0512.A64_B64_A64_20.init.gsd" 
+with gsd.hoomd.open(name=fnew, mode='wb') as f:
         f.append(newsnapshot)
 
 
