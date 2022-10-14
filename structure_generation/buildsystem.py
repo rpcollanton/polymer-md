@@ -31,9 +31,9 @@ CP = systemspec.LinearPolymerSpec(3, CPtype, CPlength, [l,l,l])
 system = systemspec.System()
 system.box = boxsize
 system.nComponents = 3
-system.component[0] = A
-system.component[1] = B
-system.component[2] = CP
+system.components[0] = A
+system.components[1] = B
+system.components[2] = CP
 
 #snap = systemgen.build_snapshot(system)
 root = "/Users/ryancollanton/Desktop/"

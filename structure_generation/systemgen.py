@@ -7,6 +7,10 @@ def wrap_coords(coords,boxsize):
     # wrap coordinates into a rectangular box with side lengths given by boxsize
 
     dims = len(boxsize)
+    if dims > 3:
+        dims = 3
+        boxsize = [0:3]
+    
     wrapped = np.zeros_like(coords)
     for i in range(dims):
         wrapped[:,i] = coords[:,i] - boxsize[i] * np.rint(coords[:,i]/boxsize[i])
@@ -57,13 +61,18 @@ def connect_chains(chains, l):
 
     return chain
 
-def walk_linearPolymer():
+def walk_linearPolymer(polymer):
 
     # walk each block of the polymer
-    
-    # connect them
+    blockcoords = []
+    for block in polymer:
+        blockcoords.append(mc_chain_walk(block.length, block.monomer.l))
 
-    return
+    # connect them
+    l = polymer.block[0].monomer.l
+    chain = connect_chains(blockcoords, l)
+
+    return chain
 
 def walkComponent(component):
     # generate a set of random walk coordinates for this component that are the right length
@@ -72,7 +81,9 @@ def walkComponent(component):
     for i in range(num):
         if isinstance(component.species, systemspec.LinearPolymerSpec):
             coordlist.append(walk_linearPolymer(component.species))  
-    return
+    
+    # coordlist is a list of numpy arrays
+    return coordlist
 
 def placeComponent():
     # take a list of random walk coordinates and randomly place each one within the specified region
@@ -81,10 +92,25 @@ def placeComponent():
 
 def systemCoordsRandom(system):
 
-    # for each component:
-    #   generate set of random walks
-    #   place where you want them 
-    #   wrap into box
+    box = system.box[0:3]
+    
+    syscoords = np.zeros(system.numparticles,3)
+
+    totaladded = 0        
+    for component in system.components:
+        # a list of coordinates for each instance of this component
+        coordlist = walkComponent(component)
+        # place center of mass of each chain at a random point
+        comlist = [np.average(coord,axis=0) for coord in coordlist]
+        randcomlist = np.multiply(box, np.random.rand(len(comlist),3)-0.5)
+        for i,coord in enumerate(coordlist):
+            newcoord = coord - comlist[i] + randcomlist[i,:]
+            newcoord = wrap_coords(newcoord, box)
+            
+            
+        coordlist = [(coord - com + randcom) for coord,com,randcom in zip(coordlist, comlist, randcomlist)]
+        
+        syscoords[totaladded,totaladded+component.numparticles] = np.arra
 
     return
 

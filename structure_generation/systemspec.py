@@ -1,4 +1,4 @@
-from cmath import pi
+import numpy as np
 
 class MonomerSpec:
 
@@ -48,6 +48,14 @@ class LinearPolymerSpec:
         self._nBlocks = value
         self._blocks = [BlockSpec() for i in range(value)]
         return    
+    
+    @property
+    def blocks(self):
+        return self._blocks
+    
+    @property
+    def length(self):
+        return np.sum([block.length for block in self.blocks])
 
 class Component:
 
@@ -72,9 +80,13 @@ class Component:
         self._N = value
         return
     
+    @property
+    def numparticles(self):
+        return self.N*self.species.length
+    
 class Box:
 
-    def __init__(self, lengths, angles=[pi/2, pi/2, pi/2]):
+    def __init__(self, lengths, angles=[np.pi/2, np.pi/2, np.pi/2]):
 
         self.lengths = lengths
         self.angles = angles
@@ -105,8 +117,15 @@ class System:
         return
     
     @property
-    def component(self):
+    def components(self):
         return self._components
+    
+    @property
+    def numparticles(self):
+        N = 0
+        for component in self.components:
+            N += component.numparticles
+        return N
     
 
 
