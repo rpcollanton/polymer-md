@@ -9,7 +9,7 @@ def wrap_coords(coords,boxsize):
     dims = len(boxsize)
     if dims > 3:
         dims = 3
-        boxsize = [0:3]
+        boxsize = boxsize[0:3]
     
     wrapped = np.zeros_like(coords)
     for i in range(dims):
@@ -85,10 +85,20 @@ def walkComponent(component):
     # coordlist is a list of numpy arrays
     return coordlist
 
-def placeComponent():
-    # take a list of random walk coordinates and randomly place each one within the specified region
+def placeComponent(coordlist, region, COM=True):
+    # take a list of random walk coordinates and randomly place COM of each one within the specified region
+    # for now, region is just a rectangular prism centered on the origin of a certain size. In future, region should be able to be
+    # any geometric region with some common descriptor/interface (i.e.: a sphere or cylinder!)
+    # if COM is true, place center of mass of chain at random point. Otherwise, place first point
+    comlist = [np.average(coord,axis=0) for coord in coordlist]
+    randcomlist = np.multiply(region, np.random.rand(len(comlist),3)-0.5)
+    newcoordlist = []
+    for i,coord in enumerate(coordlist):
+        newcoord = coord - comlist[i] + randcomlist[i,:]
+        newcoord = wrap_coords(newcoord, region)
+        newcoordlist.append(newcoord)
 
-    return 
+    return newcoordlist
 
 def systemCoordsRandom(system):
 
@@ -101,26 +111,32 @@ def systemCoordsRandom(system):
         # a list of coordinates for each instance of this component
         coordlist = walkComponent(component)
         # place center of mass of each chain at a random point
-        comlist = [np.average(coord,axis=0) for coord in coordlist]
-        randcomlist = np.multiply(box, np.random.rand(len(comlist),3)-0.5)
-        for i,coord in enumerate(coordlist):
-            newcoord = coord - comlist[i] + randcomlist[i,:]
-            newcoord = wrap_coords(newcoord, box)
-            
-            
-        coordlist = [(coord - com + randcom) for coord,com,randcom in zip(coordlist, comlist, randcomlist)]
-        
-        syscoords[totaladded,totaladded+component.numparticles] = np.arra
+        coordlist = placeComponent(coordlist, box, COM=True)
+        # sequentially add each 
+        for coord in coordlist:
+            nchain = coord.shape[0]
+            syscoords[totaladded, totaladded+nchain,:] = coord
+            totaladded += nchain
 
     return
+
+
+
+def getParticleTypes(system):
+
+    types = system.monomerlabels
+    N = system.numparticles # number of particles in system
+    typeid = [system.particleType(i) for i in range(N)]
+
+    return types, typeid
 
 def build_snapshot(system):
 
     # get system coords 
+    pos = systemCoordsRandom(system)
 
-    # get particle indices
-
-    # get particle types and type ids
+    # get particle indices, types, and type ids
+    types, typeid = getParticleTypes(system)
 
     # get bond indices
 

@@ -31,12 +31,11 @@ class BlockSpec:
 
 class LinearPolymerSpec:
 
-    def __init__(self, nBlocks, types, lengths, bondlengths):
+    def __init__(self, monomers, lengths):
         
-        self.nBlocks = nBlocks
+        self.nBlocks = len(monomers)
         for i in range(self.nBlocks):
-            mnr = MonomerSpec(types[i], bondlengths[i])
-            self._blocks[i].monomer = mnr
+            self._blocks[i].monomer = monomers[i]
             self._blocks[i].length = lengths[i]
     
     @property
@@ -57,9 +56,15 @@ class LinearPolymerSpec:
     def length(self):
         return np.sum([block.length for block in self.blocks])
 
+    @property
+    def label(self):
+        return ''.join([block.monomer.label for block in self.blocks])
+
 class Component:
 
-    def __init__(self):
+    def __init__(self, species, N):
+        self.species = species
+        self.N = N
         return
 
     @property 
@@ -96,6 +101,10 @@ class Box:
 class System:
 
     def __init__(self):
+        self._components = []
+        self._componentlabels = []
+        self._monomers = []
+        self._monomerlabels = []
         return
     
     @property
@@ -111,14 +120,38 @@ class System:
     def nComponents(self):
         return len(self._components)
 
-    @nComponents.setter
-    def nComponents(self, value):
-        self._components = [Component() for i in range(value)]
-        return
-    
     @property
     def components(self):
         return self._components
+    
+    def addComponent(self, species, N):
+        self.components.append(Component(species, N))
+        self._componentlabels.append(species.label)
+        return self.components[-1]
+    
+    def componentByLabel(self,label):
+        return self.components[self._componentlabels.index(label)]
+    
+    @property
+    def nMonomers(self):
+        return len(self._monomers)
+
+    @property
+    def monomers(self):
+        return self._monomers
+    
+    @property
+    def monomerlabels(self):
+        return self._monomerlabels
+    
+    def addMonomer(self, label, l):
+        self.monomers.append(MonomerSpec(label, l))
+        self._monomerlabels.append(label)
+        return self.monomers[-1]
+
+    def monomerByLabel(self,label):
+        return self.monomers[self._monomerlabels.index(label)]
+        
     
     @property
     def numparticles(self):
@@ -127,6 +160,21 @@ class System:
             N += component.numparticles
         return N
     
+    def particleType(self, N)
+
+        # takes an index
+
+        # finds the right component
+
+        # finds the right species
+
+        # finds the right block
+
+        # finds the right monomer
+
+        # returns the monomer (or j the monomer label?)
+    
+        return
 
 
 # Workflow:
