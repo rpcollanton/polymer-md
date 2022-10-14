@@ -1,10 +1,16 @@
+import types
 import numpy as np
 
 class MonomerSpec:
 
-    def __init__(self, label, l):
+    def __init__(self, label, l, uniqueid):
         self.l = l
         self.label = label
+        self._uniqueid = uniqueid
+
+    @property
+    def uniqueid(self):
+        return self._uniqueid
 
 class BlockSpec:
 
@@ -60,6 +66,43 @@ class LinearPolymerSpec:
     def label(self):
         return ''.join([block.monomer.label for block in self.blocks])
 
+    @property
+    def bonds(self):
+        # this is specific to a linear polymer
+        # all the bonds, assuming that the first particle is indexed at 0 
+        bonds = []
+        Ntot = 0
+        for idxblock,block in enumerate(self.blocks):
+            # within the block
+            for i in range(1,block.length):
+                bonds.append([Ntot + (i-1), Ntot + i])
+            # connect the blocks
+            if idxblock < (self.nBlocks-1):
+                bonds.append([Ntot + block.length - 1, Ntot + block.length])
+            # chain length so far
+            Ntot + block.length
+        
+        return bonds
+
+    @property
+    def bondtypes(self):
+        # this is specific to a linear polymer
+        # all the bond types
+        bondtypes = []
+        for idxblock, block in enumerate(self.blocks):
+            # within the block
+            for i in range(1,block.length):
+                bondtypes.append('{:s}-{:s}'.format(block.monomer.label, block.monomer.label))
+            # connect the blocks
+            if idxblock < (self.nBlocks-1):
+                uniqueids = [block.monomer.uniqueid, self.blocks[idxblock+1].monomer.uniqueid]
+                labels = [block.monomer.label, self.blocks[idxblock+1].monomer.label]
+                minID = np.argmin(uniqueids)
+                maxID = np.argmax(uniqueids)
+                bondtypes.append('{:s}-{:s}'.format(labels[minID], labels[maxID]))
+
+        return bondtypes
+
 class Component:
 
     def __init__(self, species, N):
@@ -91,10 +134,10 @@ class Component:
     
 class Box:
 
-    def __init__(self, lengths, angles=[np.pi/2, np.pi/2, np.pi/2]):
+    def __init__(self, lengths, tilts=[0,0,0]):
 
         self.lengths = lengths
-        self.angles = angles
+        self.tilts = tilts
 
         return
 
@@ -109,11 +152,14 @@ class System:
     
     @property
     def box(self):
-        return self._box.lengths + self._box.angles
+        return self._box.lengths + self._box.tilts
     
     @box.setter
     def box(self, size):
-        self._box = Box(size[0:3], size[3:])
+        if len(size) == 6:
+            self._box = Box(size[0:3], size[3:])
+        else:
+            self._box = Box(size)
         return
     
     @property
@@ -145,13 +191,13 @@ class System:
         return self._monomerlabels
     
     def addMonomer(self, label, l):
-        self.monomers.append(MonomerSpec(label, l))
+        uniqueid = self.nMonomers
+        self.monomers.append(MonomerSpec(label, l, uniqueid))
         self._monomerlabels.append(label)
         return self.monomers[-1]
 
     def monomerByLabel(self,label):
         return self.monomers[self._monomerlabels.index(label)]
-        
     
     @property
     def numparticles(self):
@@ -160,23 +206,58 @@ class System:
             N += component.numparticles
         return N
     
-    def particleType(self, N)
+    def particleType(self, N):
 
-        # takes an index
-
+        # takes a particle index
         # finds the right component
+        count = 0
+        idx_component = -1
+        while count < N:
+            idx_component += 1
+            count += self.components[idx_component].numparticles
+        count -= self.components[idx_component].numparticles 
+        # Note: count will finish being equal to the number of particles preceding this component
 
-        # finds the right species
+        # find the idx on the species chain
+        idx_species = (N - count) % self.component[idx_component].species.length
 
-        # finds the right block
+        # find the right block
+        count = 0
+        idx_block = -1
+        while count < idx_species:
+            idx_block += 1
+            count += self.components[idx_component].species.blocks[idx_block].length
 
-        # finds the right monomer
-
-        # returns the monomer (or j the monomer label?)
+        # returns the monomer associated with this block
+        return self.components[idx_component].species.blocks[idx_block].monomer
     
-        return
+    def particleTypes(self):
+        # returns a list of all particle types in order
+        # faster than running particleType for each particle
 
+        types = []
+        for component in self.components:
+            for i in range(component.N):
+                for block in component.species.blocks:
+                    for j in range(block.length):
+                        types.append(block.monomer.label)
 
+        return types
+    
+    def bonds(self):
+
+        bonds = []
+        bondtypes = []
+        idx_start = 0
+        for component in self.components:
+            for i in range(component.N):
+                bonds += ( np.array(component.species.bonds) + idx_start ).tolist()
+                bondtypes += component.species.bondtypes
+                idx_start += component.species.length
+        
+        return bonds, bondtypes
+
+    
 # Workflow:
 # Make a system
 # Set the box size

@@ -56,8 +56,8 @@ def connect_chains(chains, l):
             twostepdist = np.linalg.norm(chainstart - chain[-2,:])
             if twostepdist > twostepcutoff:
                 break
-        addedchaincoords = chains[i] - chains[i][0,:] + chainstart
-        chain.append(chain, addedchaincoords, axis = 0)
+        combinedchaincoords = chains[i] - chains[i][0,:] + chainstart
+        chain = np.append(chain, combinedchaincoords, axis = 0)
 
     return chain
 
@@ -65,11 +65,13 @@ def walk_linearPolymer(polymer):
 
     # walk each block of the polymer
     blockcoords = []
-    for block in polymer:
+    for block in polymer.blocks:
         blockcoords.append(mc_chain_walk(block.length, block.monomer.l))
 
     # connect them
-    l = polymer.block[0].monomer.l
+    # NOTE: this is an escapist solution. 
+    # I need to find a way to account for different bond lengths l cleanly
+    l = polymer.blocks[0].monomer.l
     chain = connect_chains(blockcoords, l)
 
     return chain
@@ -104,7 +106,7 @@ def systemCoordsRandom(system):
 
     box = system.box[0:3]
     
-    syscoords = np.zeros(system.numparticles,3)
+    syscoords = np.zeros((system.numparticles,3))
 
     totaladded = 0        
     for component in system.components:
@@ -115,22 +117,32 @@ def systemCoordsRandom(system):
         # sequentially add each 
         for coord in coordlist:
             nchain = coord.shape[0]
-            syscoords[totaladded, totaladded+nchain,:] = coord
+            syscoords[totaladded:totaladded+nchain,:] = coord
             totaladded += nchain
 
-    return
-
-
+    return syscoords
 
 def getParticleTypes(system):
 
     types = system.monomerlabels
     N = system.numparticles # number of particles in system
-    typeid = [system.particleType(i) for i in range(N)]
+    alltypes = system.particleTypes()
+    typeid = [types.index(label) for label in alltypes]
 
     return types, typeid
 
+def getBondTypes(system):
+    bonds, allbondtypes = system.bonds()
+    bondtypes = list(set(allbondtypes))
+    bondtypeid = [bondtypes.index(bondlabel) for bondlabel in allbondtypes]
+
+    return bonds, bondtypes, bondtypeid
+
 def build_snapshot(system):
+
+    # get system box size, total number of particles, 
+    box = system.box
+    N = system.numparticles
 
     # get system coords 
     pos = systemCoordsRandom(system)
@@ -138,10 +150,30 @@ def build_snapshot(system):
     # get particle indices, types, and type ids
     types, typeid = getParticleTypes(system)
 
-    # get bond indices
+    # get bond indices, types, and type ids
+    bondgroup, bondtypes, bondtypeid = getBondTypes(system)
+    nBonds = len(bondgroup)
 
-    # get bond types and type ids
+    # generate snapshot!!
+    snapshot = gsd.hoomd.Snapshot()
+    snapshot.configuration.box = box
+    snapshot.particles.N = N
+    snapshot.particles.position = pos
+    snapshot.particles.types = types
+    snapshot.particles.typeid = typeid
+    snapshot.bonds.N = nBonds
+    snapshot.bonds.types = bondtypes
+    snapshot.bonds.typeid = bondtypeid
+    snapshot.bonds.group = bondgroup
 
-    # 
-
-    return
+    debugging = True
+    if debugging:
+        print("Number of particles:             N = {:d}".format(N))
+        print("Number of positions:             pos.shape[0] = {:d}".format(pos.shape[0]))
+        print("Number of particle types:        len(types) = {:d}".format(len(types)))
+        print("Number of particle type ids:     len(typeid) = {:d}".format(len(typeid)))
+        print("Number of bonds:                 nBonds = {:d}".format(nBonds))
+        print("Number of bond types:            len(bondtypes) = {:d}".format(len(bondtypes)))
+        print("Number of bond type ids:         len(bondtypeid) = {:d}".format(len(bondtypeid)))
+        print("Number of bond groups:           len(bondgroup) = {:d}".format(len(bondgroup)))
+    return snapshot
