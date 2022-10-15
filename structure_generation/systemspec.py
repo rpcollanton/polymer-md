@@ -80,7 +80,7 @@ class LinearPolymerSpec:
             if idxblock < (self.nBlocks-1):
                 bonds.append([Ntot + block.length - 1, Ntot + block.length])
             # chain length so far
-            Ntot + block.length
+            Ntot += block.length
         
         return bonds
 
