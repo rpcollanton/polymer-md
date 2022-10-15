@@ -87,17 +87,16 @@ def walkComponent(component):
     # coordlist is a list of numpy arrays
     return coordlist
 
-def placeComponent(coordlist, region, COM=True):
+def placeComponent(coordlist, region, regioncenter=[0,0,0], COM=True):
     # take a list of random walk coordinates and randomly place COM of each one within the specified region
     # for now, region is just a rectangular prism centered on the origin of a certain size. In future, region should be able to be
     # any geometric region with some common descriptor/interface (i.e.: a sphere or cylinder!)
     # if COM is true, place center of mass of chain at random point. Otherwise, place first point
     comlist = [np.average(coord,axis=0) for coord in coordlist]
-    randcomlist = np.multiply(region, np.random.rand(len(comlist),3)-0.5)
+    randcomlist = np.multiply(region, np.random.rand(len(comlist),3)-0.5) + np.array(regioncenter)
     newcoordlist = []
     for i,coord in enumerate(coordlist):
         newcoord = coord - comlist[i] + randcomlist[i,:]
-        newcoord = wrap_coords(newcoord, region)
         newcoordlist.append(newcoord)
 
     return newcoordlist
@@ -120,6 +119,31 @@ def systemCoordsRandom(system):
             syscoords[totaladded:totaladded+nchain,:] = coord
             totaladded += nchain
 
+    syscoords = wrap_coords(syscoords, box)
+    return syscoords
+
+def systemCoordsBoxRegions(system, regions, regioncenters):
+
+    # regions is a list of regions with length equal to the number of components
+    # the intention is that these should be used to seed components as phase-separated in advance
+     
+    box = system.box[0:3]
+    
+    syscoords = np.zeros((system.numparticles,3))
+
+    totaladded = 0        
+    for i,component in enumerate(system.components):
+        # a list of coordinates for each instance of this component
+        coordlist = walkComponent(component)
+        # place center of mass of each chain at a random point
+        coordlist = placeComponent(coordlist, regions[i], regioncenters[i], COM=True)
+        # sequentially add each 
+        for coord in coordlist:
+            nchain = coord.shape[0]
+            syscoords[totaladded:totaladded+nchain,:] = coord
+            totaladded += nchain
+
+    syscoords = wrap_coords(syscoords, box)
     return syscoords
 
 def getParticleTypes(system):
@@ -138,14 +162,19 @@ def getBondTypes(system):
 
     return bonds, bondtypes, bondtypeid
 
-def build_snapshot(system):
+def build_snapshot(system, type='random', regions=[], regioncenters=[]):
 
     # get system box size, total number of particles, 
     box = system.box
     N = system.numparticles
 
     # get system coords 
-    pos = systemCoordsRandom(system)
+    if type == 'random':
+        pos = systemCoordsRandom(system)
+    elif type == 'boxregions':
+        if len(regions)==0 or len(regioncenters)==0:
+            raise ValueError("No regions specified.")
+        pos = systemCoordsBoxRegions(system, regions, regioncenters)
 
     # get particle indices, types, and type ids
     types, typeid = getParticleTypes(system)
