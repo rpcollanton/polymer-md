@@ -36,7 +36,7 @@ system.addComponent(poly_B, M_B)
 system.addComponent(poly_ABA, M_CP)
 
 snap = systemgen.build_snapshot(system)
-root = "/Users/ryancollanton/Desktop/"
+root = "init/"
 stem = "A{:03d}_{:04d}_B{:03d}_{:04d}.A{:03d}_B{:03d}_A{:03d}_{:04d}.init.gsd".format(N_A[0], M_A, N_B[0], M_B, N_CP[0], N_CP[1], N_CP[2], M_CP)
 fname = root + stem
 write_gsd_from_snapshot(snap, fname)
