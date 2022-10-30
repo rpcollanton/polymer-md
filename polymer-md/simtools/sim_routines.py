@@ -1,58 +1,26 @@
 import hoomd
+import custom
 import numpy as np
-import datetime
 import itertools
 
-class Status():
-
-    def __init__(self, sim):
-        self.sim = sim
-
-    @property
-    def seconds_remaining(self):
-        try:
-            return (self.sim.final_timestep - self.sim.timestep) / self.sim.tps
-        except ZeroDivisionError:
-            return 0
-
-    @property
-    def etr(self):
-        return str(datetime.timedelta(seconds=self.seconds_remaining))
-
-class Thermo():
-    
-    def __init__(self, sim):
-        self.sim = sim
-        self.quantities = hoomd.md.compute.ThermodynamicQuantities(filter=hoomd.filter.All())
-        self.sim.operations.computes.append(self.quantities)
-
-    @property
-    def total_energy(self):
-        if self.sim.timestep > 0:
-            return self.quantities.kinetic_energy + self.quantities.potential_energy
-        else:
-            return 0
-
-def __write_state(sim, iter, fname):
-
-    # write gsd at end
-    write_final_gsd = hoomd.write.GSD(filename=fname,
+def add_write_state(sim, iter, fname):
+    # write gsd at a certain iteration number
+    write_gsd = hoomd.write.GSD(filename=fname,
                              trigger=hoomd.trigger.On(iter),
                              mode='wb')
-    sim.operations.writers.append(write_final_gsd)
+    sim.operations.writers.append(write_gsd)
+    return
 
-    return sim
-
-def __write_trajectory(sim, period, ftraj):
+def add_write_trajectory(sim, period, ftraj):
 
     write_traj_gsd = hoomd.write.GSD(filename=ftraj,
                             trigger=hoomd.trigger.Periodic(period=period),
                             mode='wb')
     sim.operations.writers.append(write_traj_gsd)
 
-    return sim
+    return
 
-def __table_log(sim, period, writeTiming, writeThermo):
+def add_table_log(sim, period, writeTiming, writeThermo):
 
     logger = hoomd.logging.Logger(categories=['scalar','string'])
     logger.add(sim, ['timestep'])
@@ -60,12 +28,12 @@ def __table_log(sim, period, writeTiming, writeThermo):
     if writeTiming:
         logger.add(sim, ['tps'])
         # compute estimated time remaining
-        stat = Status(sim)
+        stat = custom.Status(sim)
         logger[('Status', 'etr')] = (stat, 'etr', 'string')
 
     if writeThermo:
         # compute thermodynamics
-        thermo = Thermo(sim)
+        thermo = custom.Thermo(sim)
         thermo_props = thermo.quantities
         logger.add(thermo_props, ['kinetic_temperature', 'pressure', 'kinetic_energy', 'potential_energy'], 'Thermo')
         logger[('Thermo', 'total_energy')] = (thermo, "total_energy", 'scalar')
@@ -74,7 +42,7 @@ def __table_log(sim, period, writeTiming, writeThermo):
     table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(period=period),logger=logger)
     sim.operations.writers.append(table)
 
-    return sim
+    return
 
 def remove_overlaps(initial_state, device, kT, prefactor_range, iterations, fname):
 
@@ -254,14 +222,14 @@ def run_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, fen
 
     if ftraj!=None:
         # write trajectory
-        sim = __write_trajectory(sim, period, ftraj)
+        add_write_trajectory(sim, period, ftraj)
 
     if fstruct!=None:
         # write final state
-        sim = __write_state(sim, iterations, fstruct)
+        add_write_state(sim, iterations, fstruct)
 
-    # table logger
-    sim = __table_log(sim, period, writeTiming=True, writeThermo=True)
+    # add table logger
+    add_table_log(sim, period, writeTiming=True, writeThermo=True)
     
     sim.run(iterations)
 
@@ -288,14 +256,14 @@ def run_DPD_FENE(initial_state, device, iterations, period, dpdParam, dpd_rcut, 
 
     if ftraj!=None:
         # write trajectory
-        sim = __write_trajectory(sim, period, ftraj)
+        add_write_trajectory(sim, period, ftraj)
 
     if fstruct!=None:
         # write final state
-        sim = __write_state(sim, iterations, fstruct)
+        add_write_state(sim, iterations, fstruct)
 
     # table logger
-    sim = __table_log(sim, period, writeTiming=True, writeThermo=True)
+    add_table_log(sim, period, writeTiming=True, writeThermo=True)
     
     sim.run(iterations)
 
@@ -330,11 +298,11 @@ def run_GAUSSION_FENE(initial_state, device, kT, prefactor_range, feneParam, ite
     sim.operations.integrator = integrator
 
     # table logger
-    sim = __table_log(sim, 5000, writeTiming=True, writeThermo=True)
+    add_table_log(sim, 5000, writeTiming=True, writeThermo=True)
 
     # write final state
     if fname!=None:
-        sim = __write_state(sim, iterations, fname)
+        add_write_state(sim, iterations, fname)
 
     # ramp up prefactor gradually
     typepairs = list(itertools.combinations_with_replacement(initial_state.particles.types,2))
