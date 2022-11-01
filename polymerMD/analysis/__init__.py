@@ -1,3 +1,3 @@
 from . import trajtools
-#from . import structure
-#from . import interface
+from . import structure
+from . import interface

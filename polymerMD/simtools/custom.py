@@ -5,7 +5,7 @@ class Slice1DFilter(hoomd.filter.CustomFilter):
 
     def __init__(self,axis,min_coord,max_coord):
         # axis can be 0 1 2 or 'x' 'y' 'z'
-        if isinstance(axis,string):
+        if isinstance(axis,str):
             if not axis.isnumeric():
                 # convert to numeric
                 conv = {'x':0, 'y':1, 'z':2}

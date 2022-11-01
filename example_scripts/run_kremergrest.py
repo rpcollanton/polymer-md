@@ -1,7 +1,8 @@
-import sim_routines
 import gsd.hoomd
 import hoomd
-import polygen
+from polymerMD.simtools import sim_routines
+from polymerMD.structure import polygen
+
 
 # polymer attributes
 N = 16

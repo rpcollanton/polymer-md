@@ -49,7 +49,7 @@ def remove_overlaps(initial_state, device, kT, prefactor_range, iterations, fnam
 
     # bonded interactions
     feneParam = dict(k=60.0, r0=1.5, epsilon=0.0, sigma=1.0, delta=0.0)
-    snap = run_GAUSSION_FENE(initial_state, device, kT, prefactor_range, feneParam, iterations, fname)
+    snap = run_GAUSSIAN_FENE(initial_state, device, kT, prefactor_range, feneParam, iterations, fname)
 
     return snap
 
@@ -269,7 +269,7 @@ def run_DPD_FENE(initial_state, device, iterations, period, dpdParam, dpd_rcut, 
 
     return sim.state.get_snapshot()
 
-def run_GAUSSION_FENE(initial_state, device, kT, prefactor_range, feneParam, iterations, fname=None):
+def run_GAUSSIAN_FENE(initial_state, device, kT, prefactor_range, feneParam, iterations, fname=None):
     sim = hoomd.Simulation(device=device, seed=1)
     sim.create_state_from_snapshot(initial_state)
 

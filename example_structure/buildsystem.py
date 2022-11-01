@@ -1,6 +1,6 @@
-import systemspec
+import polymerMD.structure.systemspec as systemspec
+import polymerMD.structure.systemgen as systemgen
 import numpy as np
-import systemgen
 import gsd.hoomd
 
 def write_gsd_from_snapshot(snapshot, fname):

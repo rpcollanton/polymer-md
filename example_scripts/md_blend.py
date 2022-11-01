@@ -1,7 +1,5 @@
-import sim_routines
-import gsd.hoomd
 import hoomd
-import polygen
+from polymerMD.simtools import sim_routines
 
 def run(snap_init, equilItr, period, epsAB, strID, strSys, rootdir):
     

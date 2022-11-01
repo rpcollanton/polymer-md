@@ -1,7 +1,7 @@
-import sim_routines
 import gsd.hoomd
 import hoomd
-import polygen
+from polymerMD.simtools import sim_routines
+from polymerMD.structure import polygen
 
 # TEST #
 N_A = 16
@@ -30,13 +30,13 @@ cpu = hoomd.device.CPU()
 gpu = hoomd.device.CPU()
 
 fname = "struct/macrosep.init.{:s}.gsd".format(strSize)
-state_init = sim_routines.remove_overlaps_AB(snap_rand, gpu, kT, 
+state_init = sim_routines.remove_overlaps(snap_rand, gpu, kT, 
                                             [prefactor_min, prefactor_max], iterations, fname)
 
 # relax remaining overlaps with displacement capped NVE dynamics
 iterations = 15000
 fname = "struct/macrosep.relax.{:s}.gsd".format(strSize)
-state_relax = sim_routines.relax_overlaps_AB(state_init, cpu, epsAB, iterations, fname)
+state_relax = sim_routines.relax_overlaps(state_init, cpu, epsAB, iterations, fname)
 
 # equilibrate NPT
 fname = "struct/macrosep.npt.{:s}.gsd".format(strSize)

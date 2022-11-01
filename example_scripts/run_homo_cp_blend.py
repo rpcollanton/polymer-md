@@ -1,8 +1,6 @@
-import numpy as np
-import sim_routines
 import gsd.hoomd
-import gsd.pygsd
 import hoomd
+from polymerMD.simtools import sim_routines
 
 def read_snapshot_from_gsd(fname):
 
