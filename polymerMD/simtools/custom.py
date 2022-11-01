@@ -57,8 +57,33 @@ class Thermo():
 
     @property
     def total_energy(self):
+        return self.kinetic_energy + self.potential_energy
+    
+    @property
+    def kinetic_energy(self):
         if self.sim.timestep > 0:
-            return self.quantities.kinetic_energy + self.quantities.potential_energy
+            return self.quantities.kinetic_energy
+        else:
+            return 0
+    
+    @property
+    def potential_energy(self):
+        if self.sim.timestep > 0:
+            return self.quantities.potential_energy
+        else:
+            return 0
+
+    @property
+    def pressure(self):
+        if self.sim.timestep > 0:
+            return self.quantities.pressure
+        else:
+            return 0
+    
+    @property
+    def temperature(self):
+        if self.sim.timestep > 0:
+            return self.quantities.kinetic_temperature
         else:
             return 0
 

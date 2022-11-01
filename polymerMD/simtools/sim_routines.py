@@ -26,7 +26,7 @@ def add_table_log(sim, period, writeTiming, writeThermo):
     logger.add(sim, ['timestep'])
 
     if writeTiming:
-        logger.add(sim, ['tps'])
+        logger.add(sim, ['tps','walltime'])
         # compute estimated time remaining
         stat = custom.Status(sim)
         logger[('Status', 'etr')] = (stat, 'etr', 'string')
@@ -34,9 +34,12 @@ def add_table_log(sim, period, writeTiming, writeThermo):
     if writeThermo:
         # compute thermodynamics
         thermo = custom.Thermo(sim)
-        thermo_props = thermo.quantities
-        logger.add(thermo_props, ['kinetic_temperature', 'pressure', 'kinetic_energy', 'potential_energy'], 'Thermo')
+        logger[('Thermo', 'temperature')] = (thermo, "temperature", 'scalar')
+        logger[('Thermo', 'pressure')] = (thermo, "pressure", 'scalar')
+        logger[('Thermo', 'kinetic_energy')] = (thermo, "kinetic_energy", 'scalar')
+        logger[('Thermo', 'potential_energy')] = (thermo, "potential_energy", 'scalar')
         logger[('Thermo', 'total_energy')] = (thermo, "total_energy", 'scalar')
+        
 
 
     table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(period=period),logger=logger)
@@ -44,8 +47,11 @@ def add_table_log(sim, period, writeTiming, writeThermo):
 
     return
 
-def remove_overlaps(initial_state, device, kT, prefactor_range, iterations, fname):
+def add_gsd_log(sim, period, writeThermo, writeSpatialThermo):
 
+    return
+
+def remove_overlaps(initial_state, device, kT, prefactor_range, iterations, fname):
 
     # bonded interactions
     feneParam = dict(k=60.0, r0=1.5, epsilon=0.0, sigma=1.0, delta=0.0)
@@ -213,7 +219,7 @@ def run_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, fen
 
     # LJ non-bonded interactions
     nlist = hoomd.md.nlist.Cell(buffer=0.5) # buffer impacts performance, not correctness, with default other settings!
-    lj = hoomd.md.pair.LJ(nlist, default_r_cut=lj_rcut) # same cutoff as LJ in simulation
+    lj = hoomd.md.pair.LJ(nlist, default_r_cut=lj_rcut)
     lj.params = ljParam
     
     # integrator
@@ -246,7 +252,7 @@ def run_DPD_FENE(initial_state, device, iterations, period, dpdParam, dpd_rcut, 
 
     # LJ non-bonded interactions
     nlist = hoomd.md.nlist.Cell(buffer=0.5) # buffer impacts performance, not correctness, with default other settings!
-    dpd = hoomd.md.pair.DPD(nlist, kT=kT, default_r_cut=dpd_rcut) # same cutoff as LJ in simulation
+    dpd = hoomd.md.pair.DPD(nlist, kT=kT, default_r_cut=dpd_rcut)
     dpd.params = dpdParam
     
     # integrator
