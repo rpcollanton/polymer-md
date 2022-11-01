@@ -1,9 +1,7 @@
 import gsd.hoomd
 import gsd.pygsd
 import numpy as np
-import matplotlib.pyplot as plt
-from pathlib import Path
-from utility import *
+from . import utility
 
 # analysis functions
 def density_system(f):
@@ -36,10 +34,10 @@ def density_profile_1D(f, nBins=100, axis=0):
     for i,type in enumerate(types):
         mask = particleTypeID==i
         coords = particleCoord[mask,:]
-        hists[type] = binned_density_1D(coords, box, axis, nBins)
+        hists[type] = utility.binned_density_1D(coords, box, axis, nBins)
 
     # modify histograms so that sum over species in each bin is 1. IE: convert to vol frac
-    hists = count_to_volfrac(hists)
+    hists = utility.count_to_volfrac(hists)
 
     return hists
 
@@ -66,10 +64,10 @@ def volfrac_fields(f, nBins=None):
     for i,type in enumerate(types):
         mask = particleTypeID==i
         coords = particleCoord[mask,:]
-        hists[type] = binned_density_ND(coords, box, N=3, nBins=nBins)
+        hists[type] = utility.binned_density_ND(coords, box, N=3, nBins=nBins)
 
     # convert to "volume fractions"
-    volfracs = count_to_volfrac(hists)
+    volfracs = utility.count_to_volfrac(hists)
 
     return volfracs
 
@@ -109,7 +107,7 @@ def overlap_integral(f, nBins=None):
     for i in range(nTypes):
         for j in range(i, nTypes):
             dat = np.multiply(volfracs[types[i]][0], volfracs[types[j]][0])
-            overlaps[i,j] = integral_ND( dat, x, N=3 )
+            overlaps[i,j] = utility.integral_ND( dat, x, N=3 )
             overlaps[j,i] = overlaps[i,j]
 
     return overlaps

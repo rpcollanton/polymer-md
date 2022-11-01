@@ -1,5 +1,5 @@
 import numpy as np
-import systemspec
+from . import systemspec
 import gsd.hoomd
 
 def wrap_coords(coords,boxsize):
