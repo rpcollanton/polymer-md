@@ -1,5 +1,5 @@
 import hoomd
-import custom
+from polymerMD.simtools import custom
 import numpy as np
 import itertools
 

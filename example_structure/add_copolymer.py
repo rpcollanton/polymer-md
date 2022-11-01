@@ -1,7 +1,7 @@
 import gsd.hoomd
 import gsd.pygsd
 import numpy as np
-from polygen import chain_walk, wrap_coords
+from polymerMD.structure.polygen import chain_walk, wrap_coords
 
 def read_snapshot_from_gsd(fname):
 

@@ -1,7 +1,7 @@
 import gsd.hoomd
 import gsd.pygsd
 import numpy as np
-from . import utility
+from polymerMD.analysis import utility
 
 # analysis functions
 def density_system(f):
