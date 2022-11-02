@@ -3,7 +3,7 @@ from polymerMD.simtools import custom
 import numpy as np
 import itertools
 
-def add_write_state(sim, iter, fname):
+def add_write_state(sim: hoomd.Simulation, iter: int, fname: str):
     # write gsd at a certain iteration number
     write_gsd = hoomd.write.GSD(filename=fname,
                              trigger=hoomd.trigger.On(iter),
@@ -11,7 +11,7 @@ def add_write_state(sim, iter, fname):
     sim.operations.writers.append(write_gsd)
     return
 
-def add_write_trajectory(sim, period, ftraj):
+def add_write_trajectory(sim: hoomd.Simulation, period: int, ftraj: str):
 
     write_traj_gsd = hoomd.write.GSD(filename=ftraj,
                             trigger=hoomd.trigger.Periodic(period=period),
@@ -20,7 +20,7 @@ def add_write_trajectory(sim, period, ftraj):
 
     return
 
-def add_table_log(sim, period, writeTiming, writeThermo):
+def add_table_log(sim: hoomd.Simulation, period: int, writeTiming: bool, writeThermo: bool):
 
     logger = hoomd.logging.Logger(categories=['scalar','string'])
     logger.add(sim, ['timestep'])
@@ -41,15 +41,44 @@ def add_table_log(sim, period, writeTiming, writeThermo):
         logger[('Thermo', 'total_energy')] = (thermo, "total_energy", 'scalar')
         
 
-
     table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(period=period),logger=logger)
     sim.operations.writers.append(table)
 
     return
 
-def add_gsd_log(sim, period, writeThermo, writeSpatialThermo):
+def add_spatial_thermo(sim: hoomd.Simulation, period: int, axis: int, nbins: int, fname: str):
 
-    return
+    Lmin = -sim.box[axis]/2
+    Lmax = +sim.box[axis]/2
+    edges = np.linspace(Lmin, Lmax, nbins, endpoint=True)
+
+    # create filters and add filter updater to simulation with period matching thermo log period
+    filters1D = [custom.Slice1DFilter(axis,edges[i],edges[i+1]) for i in range(nbins)]
+    trigger = hoomd.trigger.Periodic(period)
+    updater = hoomd.update.FilterUpdater(trigger=trigger, filters=filters1D)
+    sim.operations.updaters.append(updater)
+    
+    # create and add spatially discretized thermodynamic quantity computes to simulation
+    spatialthermo = custom.Thermo1DSpatial(sim,filters1D)
+
+    # create logger and store basic simulation information
+    logger = hoomd.logging.Logger(categories=['sequence'])
+    logger.add(sim, ['timestep'])
+    
+    # store all spatial thermo information
+    logger[('Thermo1DSpatial', 'temperature')] = (spatialthermo, "temperature", 'sequence')
+    logger[('Thermo1DSpatial', 'kinetic_energy')] = (spatialthermo, "kinetic_energy", 'sequence')
+    logger[('Thermo1DSpatial', 'potential_energy')] = (spatialthermo, "potential_energy", 'sequence')
+    logger[('Thermo1DSpatial', 'spatial_pressure_tensor')] = (spatialthermo, "spatial_pressure_tensor", 'sequence')
+
+    # create spatial thermo gsd log file
+    log_writer = hoomd.write.GSD(filename=fname, trigger=trigger, mode='xb', filter=hoomd.filter.Null())
+    log_writer.log = logger
+    sim.operations.writers.append(log_writer)
+
+    # write edges somewhere!
+
+    return logger
 
 def remove_overlaps(initial_state, device, kT, prefactor_range, iterations, fname):
 

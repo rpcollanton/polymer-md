@@ -1,5 +1,8 @@
+from multiprocessing.sharedctypes import Value
+from typing import List
 import hoomd
 import datetime
+import numpy as np
 
 class Slice1DFilter(hoomd.filter.CustomFilter):
 
@@ -50,10 +53,12 @@ class Status():
 
 class Thermo():
     
-    def __init__(self, sim):
+    def __init__(self, sim: hoomd.Simulation):
         self.sim = sim
         self.quantities = hoomd.md.compute.ThermodynamicQuantities(filter=hoomd.filter.All())
         self.sim.operations.computes.append(self.quantities)
+
+        return
 
     @property
     def total_energy(self):
@@ -87,8 +92,84 @@ class Thermo():
         else:
             return 0
 
-class SpatialThermo():
+class Thermo1DSpatial():
 
-    def __init__(self,):
+    def __init__(self, sim: hoomd.Simulation, filters: List[Slice1DFilter]):
+        self.sim = sim
+        self.filters = filters # filter updaters should be created elsewhere, wherever the period of the logger is defined
+        self.nslice = len(filters)
+
+        # create the list of thermodynamic quantity computes
+        self.thermos = []
+        for f in filters:
+            self.thermos.append(hoomd.md.compute.ThermodynamicQuantities(filter=f))
+            self.sim.operations.computes.append(self.thermos[-1])
+
+        # store the axis along which this is being computed
+        self.axis = filters[0]._axis
+        for f in filters:
+            if f._axis != self.axis:
+                ValueError("Axes in 1D filters do not match.")
+
+        # store the left and right coordinates of each slice 
+        # I don't love this because Thermo1DSpatial isn't managing the updating of these filters, and so in principle they
+        # could be out of date!! Particles in each filter might no longer be in the slices...
+        # one solution could be to make this class just deal with thermo properties for a list of corresponding filters,
+        # and some other class (or function?) responsible for updating the filters and saving the coordinates
+        # also we don't need to log the coordinates at each step??? 
+        # hmmmmmmmmmmmmmmmmmmmmmmmmmmm yeah no.
+        # self.edges = np.zeros((self.nslice,2))
+        # for i,f in enumerate(filters):
+        #     self.edges[i,0] = f._min
+        #     self.edges[i,1] = f._max
 
         return
+    
+    @property
+    def spatial_pressure_xx(self):
+        if self.sim.timestep == 0:
+            return [0]*self.nslice
+        return [t.pressure_tensor[0] for t in self.thermos] # xx component of pressure tensor
+    
+    @property
+    def spatial_pressure_yy(self):
+        if self.sim.timestep == 0:
+            return [0]*self.nslice
+        return [t.pressure_tensor[3] for t in self.thermos] # yy component of pressure tensor
+    
+    @property
+    def spatial_pressure_zz(self):
+        if self.sim.timestep == 0:
+            return [0]*self.nslice
+        return [t.pressure_tensor[5] for t in self.thermos] # zz component of pressure tensor
+
+    @property
+    def spatial_pressure_tensor(self):
+        p = np.zeros((self.nslice,5))
+        if self.sim.timestep == 0:
+            return p
+        for i,t in enumerate(self.thermos):
+            p[i,:] = np.array(t.pressure_tensor)
+        return p
+    
+    @property
+    def spatial_potential_energy(self):
+        if self.sim.timestep == 0:
+            return [0]*self.nslice
+        return [t.potential_energy for t in self.thermos]
+    
+    @property
+    def spatial_kinetic_energy(self):
+        if self.sim.timestep == 0:
+            return [0]*self.nslice
+        return [t.kinetic_energy for t in self.thermos]
+    
+    @property
+    def spatial_temperature(self):
+        if self.sim.timestep == 0:
+            return [0]*self.nslice
+        return [t.kinetic_temperature for t in self.thermos]
+    
+    # @property
+    # def edges(self):
+    #     return self.edges
