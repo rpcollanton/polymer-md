@@ -3,6 +3,16 @@ from polymerMD.simtools import custom
 import numpy as np
 import itertools
 
+def compute_mol_conformation(sim: hoomd.Simulation, period: int):
+
+    cluster = custom.getBondedClusters(sim.state) # notice, this could be any set of clusters!
+    conformation = custom.Conformation(cluster)
+    updater = hoomd.write.CustomWriter(action=conformation.updater,
+                                        trigger=hoomd.trigger.Periodic(period))
+    sim.operations.writers.append(updater)
+
+    return conformation
+
 def add_write_state(sim: hoomd.Simulation, iter: int, fname: str):
     # write gsd at a certain iteration number
     write_gsd = hoomd.write.GSD(filename=fname,
@@ -46,7 +56,7 @@ def add_table_log(sim: hoomd.Simulation, period: int, writeTiming: bool, writeTh
 
     return
 
-def add_spatial_thermo(sim: hoomd.Simulation, period: int, axis: int, nbins: int, fname: str):
+def add_spatial_thermo(sim: hoomd.Simulation, period: int, axis: int, nbins: int, flog: str, fedge: str):
 
     Lmin = -sim.box[axis]/2
     Lmax = +sim.box[axis]/2
@@ -72,13 +82,18 @@ def add_spatial_thermo(sim: hoomd.Simulation, period: int, axis: int, nbins: int
     logger[('Thermo1DSpatial', 'spatial_pressure_tensor')] = (spatialthermo, "spatial_pressure_tensor", 'sequence')
 
     # create spatial thermo gsd log file
-    log_writer = hoomd.write.GSD(filename=fname, trigger=trigger, mode='xb', filter=hoomd.filter.Null())
+    log_writer = hoomd.write.GSD(filename=flog, trigger=trigger, mode='xb', filter=hoomd.filter.Null())
     log_writer.log = logger
     sim.operations.writers.append(log_writer)
 
-    # write edges somewhere!
+    # write edges to a file!
+    # put edges on correct axis, 0s for other axis
+    # assumes edges won't be changing throughout...
+    alledges = np.zeros((len(edges),3))
+    alledges[:,axis] = edges
+    np.savetxt(fedge, alledges)
 
-    return logger
+    return logger, alledges
 
 def remove_overlaps(initial_state, device, kT, prefactor_range, iterations, fname):
 
@@ -154,7 +169,7 @@ def equilibrate(initial_state, device, kT, iterations, fstruct, ftraj):
 
     return snap
 
-def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct, ftraj):
+def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct, ftraj=None):
 
     # force field parameters
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
@@ -173,10 +188,40 @@ def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct, ftraj)
     # update period
     period = 5000
     
-    snap = run_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
+    sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
                             fstruct=fstruct, ftraj=ftraj)
+    sim.rum(iterations)
+    return sim.state.get_snapshot()
 
-    return snap
+def production(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, fthermo=None, axis=0):
+
+    # force field parameters
+    ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
+               ('B','B'): dict(epsilon=1.0, sigma=1.0),
+               ('A','B'): dict(epsilon=epsAB, sigma=1.0)}
+    lj_rcut = 2**(1/6)
+    bondParam = dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)
+    feneParam = {}
+    for bondtype in initial_state.bonds.types:
+        feneParam[bondtype] = bondParam
+
+    # langevin thermostat and integrator
+    langevin = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT = kT)
+    methods = [langevin]
+
+    # update period
+    if period==None:
+        period = 5000
+    
+    sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
+                            fstruct=fstruct, ftraj=ftraj)
+    if fthermo!=None:
+        fedge = fthermo.replace(".gsd","_bins.txt")
+        add_spatial_thermo(sim, period, axis, 50, fthermo, fedge)
+    
+    sim.run(iterations)
+
+    return sim.state.get_snapshot()
 
 def npt_relaxbox(initial_state, device, kT, P, iterations, fstruct=None, ftraj=None):
 
@@ -350,3 +395,33 @@ def run_GAUSSIAN_FENE(initial_state, device, kT, prefactor_range, feneParam, ite
     sim.run(iterations-sim.timestep) # remaining iterations
 
     return sim.state.get_snapshot()
+
+def setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=None, ftraj=None):
+    sim = hoomd.Simulation(device=device, seed=1)
+    sim.create_state_from_snapshot(initial_state)
+
+    # FENE bonded interactions
+    fenewca = hoomd.md.bond.FENEWCA()
+    fenewca.params = feneParam
+
+    # LJ non-bonded interactions
+    nlist = hoomd.md.nlist.Cell(buffer=0.5) # buffer impacts performance, not correctness, with default other settings!
+    lj = hoomd.md.pair.LJ(nlist, default_r_cut=lj_rcut)
+    lj.params = ljParam
+    
+    # integrator
+    integrator = hoomd.md.Integrator(dt=0.005, methods=methods, forces=[fenewca, lj])
+    sim.operations.integrator = integrator
+
+    if ftraj!=None:
+        # write trajectory
+        add_write_trajectory(sim, period, ftraj)
+
+    if fstruct!=None:
+        # write final state
+        add_write_state(sim, iterations, fstruct)
+
+    # add table logger
+    add_table_log(sim, period, writeTiming=True, writeThermo=True)
+    
+    return sim

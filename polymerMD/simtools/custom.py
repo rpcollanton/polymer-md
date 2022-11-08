@@ -1,9 +1,29 @@
-from multiprocessing.sharedctypes import Value
 from typing import List
 import hoomd
+import freud
 import datetime
 import numpy as np
 
+# basic functions
+def getBondedClusters(state):
+        cluster = freud.cluster.Cluster()
+        # get bond indices
+        idx_querypts = []
+        idx_pts = []
+        for bond in state.bonds.group:
+            idx_querypts.append(bond[0])
+            idx_pts.append(bond[1])
+
+        box = freud.box.Box.from_box(state.configuration.box)
+        dist = box.compute_distances(state.particles.position[idx_querypts], 
+                                     state.particles.position[idx_pts])
+        N = state.particles.N
+        bondedneighbors = freud.locality.NeighborList.from_arrays(N, N, idx_querypts, idx_pts, dist)
+        cluster.compute(state,neighbors=bondedneighbors)
+
+        return cluster
+
+# classes
 class Slice1DFilter(hoomd.filter.CustomFilter):
 
     def __init__(self,axis,min_coord,max_coord):
@@ -169,7 +189,34 @@ class Thermo1DSpatial():
         if self.sim.timestep == 0:
             return [0]*self.nslice
         return [t.kinetic_temperature for t in self.thermos]
+
+class ClusterPropertiesUpdater(hoomd.custom.Action):
+
+    def __init__(self,cluster,clprops):
+        self._clprops = clprops
+        self._clidx = cluster.cluster_idx
+        return
     
-    # @property
-    # def edges(self):
-    #     return self.edges
+    def attach(self, simulation):
+        super().attach(simulation)
+        return
+            
+    def act(self, timestep):
+        box = freud.box.Box.from_box(self._state.configuration.box)
+        self._clprops.compute((box,self._state.particles.position),self._clidx)
+        return
+
+class Conformation():
+
+    def __init__(self, cluster: freud.cluster.Cluster):
+        # initialize
+        self._cl = cluster
+        # create cluster properties object. 
+        # This will be updated by a clusterpropertiesupdater
+        self._clprop = freud.cluster.ClusterProperties()
+        self.updater = ClusterPropertiesUpdater(self._cl, self._clprop)
+        return
+    
+    @property
+    def avgRgSq(self):
+        return np.mean(self._clprop.radii_of_gyration)

@@ -83,3 +83,11 @@ def integral_ND(dat, x, N):
         I = np.trapz(I, x=x[d], axis=0) # always axis 0 because it keeps getting reduced! 
 
     return I # should be a scalar now!
+
+def findInterfaceAxis(snapshot, species):
+
+    # finds the most likely axis of the interface
+    # computes 1D binned densities of each species in species along each axis
+    # the axis with the highest range is likely the one perpendicular to the interface
+
+    return
