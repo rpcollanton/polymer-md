@@ -51,8 +51,7 @@ class Slice1DFilter(hoomd.filter.CustomFilter):
     def __call__(self,state):
         with state.cpu_local_snapshot as snap:
             pos = snap.particles.position
-            indices = (pos[self._axis,:] > self._min
-                        & pos[self._axis,:] < self._max)
+            indices = np.logical_and(pos[:,self._axis] > self._min, pos[:,self._axis] < self._max)
             return np.copy(snap.particles.tag[indices])
 
 class Status():
@@ -165,7 +164,7 @@ class Thermo1DSpatial():
 
     @property
     def spatial_pressure_tensor(self):
-        p = np.zeros((self.nslice,5))
+        p = np.zeros((self.nslice,6))
         if self.sim.timestep == 0:
             return p
         for i,t in enumerate(self.thermos):

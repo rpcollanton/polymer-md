@@ -58,9 +58,9 @@ def add_table_log(sim: hoomd.Simulation, period: int, writeTiming: bool, writeTh
 
 def add_spatial_thermo(sim: hoomd.Simulation, period: int, axis: int, nbins: int, flog: str, fedge: str):
 
-    Lmin = -sim.box[axis]/2
-    Lmax = +sim.box[axis]/2
-    edges = np.linspace(Lmin, Lmax, nbins, endpoint=True)
+    Lmin = -sim.state.box.L[axis]/2
+    Lmax = +sim.state.box.L[axis]/2
+    edges = np.linspace(Lmin, Lmax, nbins+1, endpoint=True)
 
     # create filters and add filter updater to simulation with period matching thermo log period
     filters1D = [custom.Slice1DFilter(axis,edges[i],edges[i+1]) for i in range(nbins)]
@@ -76,13 +76,13 @@ def add_spatial_thermo(sim: hoomd.Simulation, period: int, axis: int, nbins: int
     logger.add(sim, ['timestep'])
     
     # store all spatial thermo information
-    logger[('Thermo1DSpatial', 'temperature')] = (spatialthermo, "temperature", 'sequence')
-    logger[('Thermo1DSpatial', 'kinetic_energy')] = (spatialthermo, "kinetic_energy", 'sequence')
-    logger[('Thermo1DSpatial', 'potential_energy')] = (spatialthermo, "potential_energy", 'sequence')
+    logger[('Thermo1DSpatial', 'spatial_temperature')] = (spatialthermo, "spatial_temperature", 'sequence')
+    logger[('Thermo1DSpatial', 'spatial_kinetic_energy')] = (spatialthermo, "spatial_kinetic_energy", 'sequence')
+    logger[('Thermo1DSpatial', 'spatial_potential_energy')] = (spatialthermo, "spatial_potential_energy", 'sequence')
     logger[('Thermo1DSpatial', 'spatial_pressure_tensor')] = (spatialthermo, "spatial_pressure_tensor", 'sequence')
 
     # create spatial thermo gsd log file
-    log_writer = hoomd.write.GSD(filename=flog, trigger=trigger, mode='xb', filter=hoomd.filter.Null())
+    log_writer = hoomd.write.GSD(filename=flog, trigger=trigger, mode='wb', filter=hoomd.filter.Null())
     log_writer.log = logger
     sim.operations.writers.append(log_writer)
 
@@ -218,6 +218,35 @@ def production(initial_state, device, epsAB, kT, iterations, period=None, fstruc
     if fthermo!=None:
         fedge = fthermo.replace(".gsd","_bins.txt")
         add_spatial_thermo(sim, period, axis, 50, fthermo, fedge)
+    
+    sim.run(iterations)
+
+    return sim.state.get_snapshot()
+
+def output_spatial_thermo(initial_state, epsAB, kT, axis, nbins, fthermo, fedge, ):
+
+    device = hoomd.device.CPU()
+    iterations = 1
+    period = 1
+    thermoPeriod = iterations
+
+    # force field parameters
+    ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
+               ('B','B'): dict(epsilon=1.0, sigma=1.0),
+               ('A','B'): dict(epsilon=epsAB, sigma=1.0)}
+    lj_rcut = 2**(1/6)
+    bondParam = dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)
+    feneParam = {}
+    for bondtype in initial_state.bonds.types:
+        feneParam[bondtype] = bondParam
+
+    # langevin thermostat and integrator
+    langevin = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT = kT)
+    methods = [langevin]
+
+    sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
+                            fstruct=None, ftraj=None)
+    add_spatial_thermo(sim, iterations, axis, nbins, fthermo, fedge)
     
     sim.run(iterations)
 
