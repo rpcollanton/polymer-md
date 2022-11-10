@@ -1,6 +1,7 @@
 import gsd.hoomd
 import gsd.pygsd
 import numpy as np
+import scipy as sp
 from polymerMD.analysis import utility
 
 # analysis functions
@@ -111,3 +112,28 @@ def overlap_integral(f, nBins=None):
             overlaps[j,i] = overlaps[i,j]
 
     return overlaps
+
+def interfacial_tension_IK(dat, edges, axis):
+
+    # here, dat is a HOOMDTrajectory/frame containing log data 
+    # edges is a numpy array
+
+    if isinstance(dat, gsd.hoomd.HOOMDTrajectory):
+        ts = [dat[i].log["Simulation/timestep"] for i in range(len(dat))]
+        func = lambda t: overlap_integral(t, edges=edges,axis=axis) # to pass non-iterable argument
+        return ts, list(map(func, dat))
+    
+    # gamma is interfacial tension and will be computed via integration
+    p_tensor = dat.log['Thermo1DSpatial/spatial_pressure_tensor']
+    pT_indices = [0, 3, 5]
+    pN_idx = pT_indices.pop(axis)
+    integrand = p_tensor[:,pN_idx] - 1/2 * np.sum(p_tensor[:,pT_indices],axis=1)
+
+    gamma = np.trapz(integrand,edges[:-1,axis])
+
+    return gamma
+
+
+
+
+    
