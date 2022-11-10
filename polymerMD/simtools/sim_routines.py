@@ -193,7 +193,7 @@ def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct, ftraj=
     sim.rum(iterations)
     return sim.state.get_snapshot()
 
-def production(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, fthermo=None, axis=0):
+def production(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, fthermo=None, fedge=None, nBins = 40, axis=0):
 
     # force field parameters
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
@@ -215,9 +215,13 @@ def production(initial_state, device, epsAB, kT, iterations, period=None, fstruc
     
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
                             fstruct=fstruct, ftraj=ftraj)
+    
+    # add momentum zeroer! 
+    zeromomentum = hoomd.md.update.ZeroMomentum(hoomd.trigger.Periodic(2500))
+    sim.operations.updaters.append(zeromomentum)
+
     if fthermo!=None:
-        fedge = fthermo.replace(".gsd","_bins.txt")
-        add_spatial_thermo(sim, period, axis, 50, fthermo, fedge)
+        add_spatial_thermo(sim, period, axis, 40, fthermo, fedge)
     
     sim.run(iterations)
 
