@@ -190,7 +190,7 @@ def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct, ftraj=
     
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
                             fstruct=fstruct, ftraj=ftraj)
-    sim.rum(iterations)
+    sim.run(iterations)
     return sim.state.get_snapshot()
 
 def production(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, fthermo=None, axis=0):
