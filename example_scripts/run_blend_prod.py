@@ -18,7 +18,7 @@ epsAB = 1.5
 
 # simulation parameters
 cpu = hoomd.device.CPU()
-gpu = hoomd.device.CPU()
+gpu = hoomd.device.GPU()
 
 # production run of A/B homopolymer blend
 fname = "struct/{:s}.3_prod.gsd".format(idstr)

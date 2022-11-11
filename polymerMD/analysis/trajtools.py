@@ -133,7 +133,16 @@ def interfacial_tension_IK(dat, edges, axis):
 
     return gamma
 
+def ensemble_average_thermo(dat):
+    log = dat[0].log
+    nframe = len(dat)
 
+    for frame in dat[1:]:
+        for key,val in frame.log.items():
+            log[key] += val
+    
+    for key,val in log.items():
+        log[key] = val/nframe
 
-
+    return log
     
