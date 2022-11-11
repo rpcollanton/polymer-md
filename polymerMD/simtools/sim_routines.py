@@ -209,19 +209,19 @@ def production(initial_state, device, epsAB, kT, iterations, period=None, fstruc
     langevin = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT = kT)
     methods = [langevin]
 
-    # update period
+    # thermo period
     if period==None:
         period = 5000
     
-    sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
+    sim = setup_LJ_FENE(initial_state, device, iterations, 5000, ljParam, lj_rcut, feneParam, methods, 
                             fstruct=fstruct, ftraj=ftraj)
     
     # add momentum zeroer! 
-    zeromomentum = hoomd.md.update.ZeroMomentum(hoomd.trigger.Periodic(2500))
+    zeromomentum = hoomd.md.update.ZeroMomentum(hoomd.trigger.Periodic(int(period/4)))
     sim.operations.updaters.append(zeromomentum)
 
     if fthermo!=None:
-        add_spatial_thermo(sim, period, axis, 40, fthermo, fedge)
+        add_spatial_thermo(sim, period, axis, nBins, fthermo, fedge)
     
     sim.run(iterations)
 
