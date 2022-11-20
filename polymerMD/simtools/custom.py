@@ -1,5 +1,6 @@
 from typing import List
 import hoomd
+from hoomd.logging import log
 import freud
 import datetime
 import numpy as np
@@ -54,7 +55,7 @@ class Slice1DFilter(hoomd.filter.CustomFilter):
             indices = np.logical_and(pos[:,self._axis] > self._min, pos[:,self._axis] < self._max)
             return np.copy(snap.particles.tag[indices])
 
-class Status():
+class Status(metaclass=hoomd.logging.Loggable):
 
     def __init__(self, sim):
         self.sim = sim
@@ -66,52 +67,59 @@ class Status():
         except ZeroDivisionError:
             return 0
 
-    @property
+    @log
     def etr(self):
         return str(datetime.timedelta(seconds=self.seconds_remaining))
 
-class Thermo():
+class Thermo(metaclass=hoomd.logging.Loggable):
     
     def __init__(self, sim: hoomd.Simulation):
         self.sim = sim
-        self.quantities = hoomd.md.compute.ThermodynamicQuantities(filter=hoomd.filter.All())
-        self.sim.operations.computes.append(self.quantities)
+        self.thermocompute = hoomd.md.compute.ThermodynamicQuantities(filter=hoomd.filter.All())
+        self.sim.operations.computes.append(self.thermocompute)
 
         return
-
-    @property
-    def total_energy(self):
-        return self.kinetic_energy + self.potential_energy
     
-    @property
-    def kinetic_energy(self):
-        if self.sim.timestep > 0:
-            return self.quantities.kinetic_energy
-        else:
-            return 0
-    
-    @property
-    def potential_energy(self):
-        if self.sim.timestep > 0:
-            return self.quantities.potential_energy
-        else:
-            return 0
-
-    @property
-    def pressure(self):
-        if self.sim.timestep > 0:
-            return self.quantities.pressure
-        else:
-            return 0
-    
-    @property
+    @log
     def temperature(self):
         if self.sim.timestep > 0:
-            return self.quantities.kinetic_temperature
+            return self.thermocompute.kinetic_temperature
         else:
             return 0
+    
+    @log
+    def pressure(self):
+        if self.sim.timestep > 0:
+            return self.thermocompute.pressure
+        else:
+            return 0
+    
+    @log
+    def kinetic_energy(self):
+        if self.sim.timestep > 0:
+            return self.thermocompute.kinetic_energy
+        else:
+            return 0
+    
+    @log
+    def potential_energy(self):
+        if self.sim.timestep > 0:
+            return self.thermocompute.potential_energy
+        else:
+            return 0
+    
+    @log
+    def total_energy(self):
+        return self.kinetic_energy + self.potential_energy
+     
+    @log(category='sequence')
+    def pressure_tensor(self):
+        if self.sim.timestep > 0:
+            return self.thermocompute.pressure_tensor
+        else:
+            return [0]*6
 
-class Thermo1DSpatial():
+class Thermo1DSpatial(metaclass=hoomd.logging.Loggable):
 
     def __init__(self, sim: hoomd.Simulation, filters: List[Slice1DFilter]):
         self.sim = sim
@@ -144,25 +152,25 @@ class Thermo1DSpatial():
 
         return
     
-    @property
+    @log(category='sequence')
     def spatial_pressure_xx(self):
         if self.sim.timestep == 0:
             return [0]*self.nslice
         return [t.pressure_tensor[0] for t in self.thermos] # xx component of pressure tensor
     
-    @property
+    @log(category='sequence')
     def spatial_pressure_yy(self):
         if self.sim.timestep == 0:
             return [0]*self.nslice
         return [t.pressure_tensor[3] for t in self.thermos] # yy component of pressure tensor
     
-    @property
+    @log(category='sequence')
     def spatial_pressure_zz(self):
         if self.sim.timestep == 0:
             return [0]*self.nslice
         return [t.pressure_tensor[5] for t in self.thermos] # zz component of pressure tensor
 
-    @property
+    @log(category='sequence')
     def spatial_pressure_tensor(self):
         p = np.zeros((self.nslice,6))
         if self.sim.timestep == 0:
@@ -171,19 +179,19 @@ class Thermo1DSpatial():
             p[i,:] = np.array(t.pressure_tensor)
         return p
     
-    @property
+    @log(category='sequence')
     def spatial_potential_energy(self):
         if self.sim.timestep == 0:
             return [0]*self.nslice
         return [t.potential_energy for t in self.thermos]
     
-    @property
+    @log(category='sequence')
     def spatial_kinetic_energy(self):
         if self.sim.timestep == 0:
             return [0]*self.nslice
         return [t.kinetic_energy for t in self.thermos]
     
-    @property
+    @log(category='sequence')
     def spatial_temperature(self):
         if self.sim.timestep == 0:
             return [0]*self.nslice
@@ -205,17 +213,17 @@ class ClusterPropertiesUpdater(hoomd.custom.Action):
         self._clprops.compute((box,self._state.particles.position),self._clidx)
         return
 
-class Conformation():
+class Conformation(metaclass=hoomd.logging.Loggable):
 
     def __init__(self, cluster: freud.cluster.Cluster):
         # initialize
         self._cl = cluster
         # create cluster properties object. 
-        # This will be updated by a clusterpropertiesupdater
+        # This will be updated by a ClusterPropertiesUpdater
         self._clprop = freud.cluster.ClusterProperties()
         self.updater = ClusterPropertiesUpdater(self._cl, self._clprop)
         return
     
-    @property
-    def avgRgSq(self):
+    @log
+    def avgRg(self):
         return np.mean(self._clprop.radii_of_gyration)
