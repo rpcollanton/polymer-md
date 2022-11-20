@@ -21,9 +21,9 @@ def add_write_state(sim: hoomd.Simulation, iter: int, fname: str):
     sim.operations.writers.append(write_gsd)
     return
 
-def add_write_trajectory(sim: hoomd.Simulation, period: int, logger: None, ftraj: str):
+def add_write_trajectory(sim: hoomd.Simulation, period: int, ftraj: str):
 
-    write_traj_gsd = hoomd.write.GSD(filename=ftraj, logger=logger,
+    write_traj_gsd = hoomd.write.GSD(filename=ftraj,
                             trigger=hoomd.trigger.Periodic(period=period),
                             mode='wb')
     sim.operations.writers.append(write_traj_gsd)
@@ -192,7 +192,38 @@ def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct, ftraj=
     sim.run(iterations)
     return sim.state.get_snapshot()
 
-def production(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, fthermo=None, fedge=None, nBins = 40, axis=0):
+def production(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, flog=None):
+
+    # force field parameters
+    ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
+               ('B','B'): dict(epsilon=1.0, sigma=1.0),
+               ('A','B'): dict(epsilon=epsAB, sigma=1.0)}
+    lj_rcut = 2**(1/6)
+    bondParam = dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)
+    feneParam = {}
+    for bondtype in initial_state.bonds.types:
+        feneParam[bondtype] = bondParam
+
+    # langevin thermostat and integrator
+    langevin = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT = kT)
+    methods = [langevin]
+
+    # thermo period
+    if period==None:
+        period = 5000
+    
+    sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
+                            fstruct=fstruct, ftraj=ftraj, flog=flog)
+    
+    # add momentum zeroer! approximately freeze system in place, no bulk motion allowed
+    zeromomentum = hoomd.md.update.ZeroMomentum(hoomd.trigger.Periodic(int(period/2)))
+    sim.operations.updaters.append(zeromomentum)
+    
+    sim.run(iterations)
+
+    return sim.state.get_snapshot()
+
+def run_spatial_thermo(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, fthermo=None, fedge=None, nBins = 40, axis=0):
 
     # force field parameters
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
@@ -226,7 +257,7 @@ def production(initial_state, device, epsAB, kT, iterations, period=None, fstruc
 
     return sim.state.get_snapshot()
 
-def output_spatial_thermo(initial_state, epsAB, kT, axis, nbins, fthermo, fedge, ):
+def output_spatial_thermo(initial_state, epsAB, kT, axis, nbins, fthermo, fedge):
 
     device = hoomd.device.CPU()
     iterations = 1
@@ -304,7 +335,7 @@ def run_GAUSSIAN_FENE(initial_state, device, kT, prefactor_range, feneParam, ite
 
     return sim.state.get_snapshot()
 
-def setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=None, ftraj=None):
+def setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=None, ftraj=None, flog=None):
     sim = hoomd.Simulation(device=device, seed=1)
     sim.create_state_from_snapshot(initial_state)
 
@@ -323,22 +354,26 @@ def setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, f
 
     # loggable computes
     thermo = custom.Thermo(sim)
-    conformation = compute_mol_conformation(sim, period)
 
-    # (mostly) complete log
-    trajlog = hoomd.logging.Logger()
-    trajlog += thermo
-    trajlog += conformation
-    trajlog.add(sim, ['timestep'])
-
-    # full logger
     if ftraj!=None:
         # write trajectory
-        add_write_trajectory(sim, period, ftraj, logger=trajlog)
+        add_write_trajectory(sim, period, ftraj)
 
     if fstruct!=None:
         # write final state
         add_write_state(sim, iterations, fstruct)
+    
+    if flog!=None:
+        # (mostly) complete log
+        conformation = compute_mol_conformation(sim, period)
+        trajlog = hoomd.logging.Logger()
+        trajlog += thermo
+        trajlog += conformation
+        trajlog.add(sim, ['timestep'])
+        trigger = hoomd.trigger.Periodic(period)
+        log_writer = hoomd.write.GSD(filename=flog, trigger=trigger, mode='wb', filter=hoomd.filter.Null())
+        log_writer.log = trajlog
+        sim.operations.writers.append(log_writer)
 
     # add table logging
     tablelogger = basic_logger(sim, thermo)

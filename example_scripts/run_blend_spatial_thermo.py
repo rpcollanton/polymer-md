@@ -23,10 +23,14 @@ gpu = hoomd.device.GPU()
 # production run of A/B homopolymer blend
 fname = "struct/{:s}.3_prod.gsd".format(idstr)
 ftraj = "traj/{:s}.3_prod.traj.gsd".format(idstr)
-flog = "dat/{:s}.log.gsd".format(idstr)
+fthermo = "dat/{:s}.thermo.gsd".format(idstr)
+fedge = "dat/{:s}.thermo_edge.txt".format(idstr)
 iterations = 5000000
 period = 2500
+axis = 0 # axis to do spatial thermo on
+nBins = 40 # number of bins for spatial thermo
 
 print("\nStarting production simulation with FENE/LJ potential and Langevin thermostat on GPU, for iterations = {:d}".format(iterations))
-state_equil = sim_routines.production(snap_init, gpu, epsAB, kT, iterations, period=2500,
-                                        fstruct=fname, ftraj=ftraj, flog=flog)
+state_equil = sim_routines.run_spatial_thermo(snap_init, gpu, epsAB, kT, iterations, period=2500,
+                                        fstruct=fname, ftraj=ftraj, 
+                                        fthermo=fthermo, fedge=fedge, nBins=nBins, axis=axis)

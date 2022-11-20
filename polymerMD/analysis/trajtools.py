@@ -148,10 +148,9 @@ def interfacial_tension_global(dat, axis):
     pT_indices = [0, 3, 5]
     pN_idx = pT_indices.pop(axis)
     pdiff = p_tensor[:,pN_idx] - 1/2 * np.sum(p_tensor[:,pT_indices],axis=1)
-    gamma = L * pdiff # WHAT IS L??? how to log...
+    gamma = L * pdiff # WHAT IS L??? how to log...gg
 
     return gamma
-
 
 def ensemble_average_log(dat):
     avglog = dat[0].log
