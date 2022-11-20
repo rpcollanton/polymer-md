@@ -21,35 +21,31 @@ def add_write_state(sim: hoomd.Simulation, iter: int, fname: str):
     sim.operations.writers.append(write_gsd)
     return
 
-def add_write_trajectory(sim: hoomd.Simulation, period: int, ftraj: str):
+def add_write_trajectory(sim: hoomd.Simulation, period: int, logger: None, ftraj: str):
 
-    write_traj_gsd = hoomd.write.GSD(filename=ftraj,
+    write_traj_gsd = hoomd.write.GSD(filename=ftraj, logger=logger,
                             trigger=hoomd.trigger.Periodic(period=period),
                             mode='wb')
     sim.operations.writers.append(write_traj_gsd)
 
     return
 
-def add_table_log(sim: hoomd.Simulation, period: int, writeTiming: bool, writeThermo: bool):
+def basic_logger(sim: hoomd.Simulation, thermo: custom.Thermo):
 
     logger = hoomd.logging.Logger(categories=['scalar','string'])
     logger.add(sim, ['timestep'])
 
-    if writeTiming:
-        logger.add(sim, ['tps','walltime'])
-        # compute estimated time remaining
-        stat = custom.Status(sim)
-        logger[('Status', 'etr')] = (stat, 'etr', 'string')
+    logger.add(sim, ['tps','walltime'])
+    # compute estimated time remaining
+    status = custom.Status(sim)
+    logger += status
 
-    if writeThermo:
-        # compute thermodynamics
-        thermo = custom.Thermo(sim)
-        logger[('Thermo', 'temperature')] = (thermo, "temperature", 'scalar')
-        logger[('Thermo', 'pressure')] = (thermo, "pressure", 'scalar')
-        logger[('Thermo', 'kinetic_energy')] = (thermo, "kinetic_energy", 'scalar')
-        logger[('Thermo', 'potential_energy')] = (thermo, "potential_energy", 'scalar')
-        logger[('Thermo', 'total_energy')] = (thermo, "total_energy", 'scalar')
-        
+    # log thermodynamics
+    logger += thermo # won't add pressure tensor because only scalar/string
+
+    return logger
+
+def add_table_log(sim: hoomd.Simulation, period: int, logger: hoomd.logging.Logger):
 
     table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(period=period),logger=logger)
     sim.operations.writers.append(table)
@@ -120,9 +116,10 @@ def relax_overlaps(initial_state, device, iterations, fname=None):
     # update period
     period = 5000
     
-    snap = run_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=fname)
-
-    return snap
+    sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=fname)
+    sim.run(iterations)
+    
+    return sim.state.get_snapshot()
 
 def relax_overlaps_AB(initial_state, device, epsAB, iterations, fname=None):
 
@@ -146,9 +143,10 @@ def relax_overlaps_AB(initial_state, device, epsAB, iterations, fname=None):
     # update period
     period = 5000
     
-    snap = run_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=fname)
-
-    return snap
+    sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=fname)
+    sim.run(iterations)
+    
+    return sim.state.get_snapshot()
 
 def equilibrate(initial_state, device, kT, iterations, fstruct, ftraj):
 
@@ -164,10 +162,11 @@ def equilibrate(initial_state, device, kT, iterations, fstruct, ftraj):
     # update period
     period = 5000
     
-    snap = run_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
+    sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
                             fstruct=fstruct, ftraj=ftraj)
-
-    return snap
+    sim.run(iterations)
+    
+    return sim.state.get_snapshot()
 
 def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct, ftraj=None):
 
@@ -216,8 +215,8 @@ def production(initial_state, device, epsAB, kT, iterations, period=None, fstruc
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
                             fstruct=fstruct, ftraj=ftraj)
     
-    # add momentum zeroer! 
-    zeromomentum = hoomd.md.update.ZeroMomentum(hoomd.trigger.Periodic(2500))
+    # add momentum zeroer! freeze interface in place, no bulk motion allowed
+    zeromomentum = hoomd.md.update.ZeroMomentum(hoomd.trigger.Periodic(2000))
     sim.operations.updaters.append(zeromomentum)
 
     if fthermo!=None:
@@ -256,132 +255,6 @@ def output_spatial_thermo(initial_state, epsAB, kT, axis, nbins, fthermo, fedge,
 
     return sim.state.get_snapshot()
 
-def npt_relaxbox(initial_state, device, kT, P, iterations, fstruct=None, ftraj=None):
-
-    # force field parameters
-    ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0)}
-    lj_rcut = 2**(1/6)
-    feneParam = {'A-A': dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)}
-
-    # langevin thermostat and integrator
-    npt = hoomd.md.methods.NPT(filter=hoomd.filter.All(), kT=kT, tau=0.5, S=P, tauS=5, couple="xyz")
-    methods = [npt]
-
-    # update period
-    period = 5000
-    
-    snap = run_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
-                            fstruct=fstruct, ftraj=ftraj)
-
-    return snap
-
-def npt_relaxbox_AB(initial_state, device, epsAB, kT, P, iterations, fstruct=None, ftraj=None):
-
-    # force field parameters
-    ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
-               ('B','B'): dict(epsilon=1.0, sigma=1.0),
-               ('A','B'): dict(epsilon=epsAB, sigma=1.0)}
-    lj_rcut = 2**(1/6)
-    bondParam = dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)
-    feneParam = {'A-A': bondParam, 'B-B': bondParam}
-
-    # langevin thermostat and integrator
-    npt = hoomd.md.methods.NPT(filter=hoomd.filter.All(), kT=kT, tau=0.5, S=P, tauS=5, couple="xyz")
-    methods = [npt]
-
-    # update period
-    period = 5000
-    
-    snap = run_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
-                            fstruct=fstruct, ftraj=ftraj)
-
-    return snap
-
-def nvt_dpd(initial_state, device, aAB, kT, iterations, fstruct=None, ftraj=None):
-
-    # force field parameters
-    dpdParam = {('A','A'): dict(A=25.0, gamma=3.0),
-               ('B','B'): dict(A=25.0, gamma=3.0),
-               ('A','B'): dict(A=aAB, gamma=3.0)}
-    dpd_rcut = 2.5
-    bondParam = dict(k=30.0, r0=1.5, epsilon=0.0, sigma=1.0, delta=0.0)
-    feneParam = {'A-A': bondParam, 'B-B': bondParam}
-
-    # update period
-    period = 5000
-    
-    snap = run_DPD_FENE(initial_state, device, iterations, period, dpdParam, dpd_rcut, feneParam, kT,
-                            fstruct=fstruct, ftraj=ftraj)
-
-    return snap
-
-def run_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=None, ftraj=None):
-
-    sim = hoomd.Simulation(device=device, seed=1)
-    sim.create_state_from_snapshot(initial_state)
-
-    # FENE bonded interactions
-    fenewca = hoomd.md.bond.FENEWCA()
-    fenewca.params = feneParam
-
-    # LJ non-bonded interactions
-    nlist = hoomd.md.nlist.Cell(buffer=0.5) # buffer impacts performance, not correctness, with default other settings!
-    lj = hoomd.md.pair.LJ(nlist, default_r_cut=lj_rcut)
-    lj.params = ljParam
-    
-    # integrator
-    integrator = hoomd.md.Integrator(dt=0.005, methods=methods, forces=[fenewca, lj])
-    sim.operations.integrator = integrator
-
-    if ftraj!=None:
-        # write trajectory
-        add_write_trajectory(sim, period, ftraj)
-
-    if fstruct!=None:
-        # write final state
-        add_write_state(sim, iterations, fstruct)
-
-    # add table logger
-    add_table_log(sim, period, writeTiming=True, writeThermo=True)
-    
-    sim.run(iterations)
-
-    return sim.state.get_snapshot()
-
-def run_DPD_FENE(initial_state, device, iterations, period, dpdParam, dpd_rcut, feneParam, kT, fstruct=None, ftraj=None):
-
-    sim = hoomd.Simulation(device=device, seed=1)
-    sim.create_state_from_snapshot(initial_state)
-
-    # FENE bonded interactions
-    fenewca = hoomd.md.bond.FENEWCA()
-    fenewca.params = feneParam
-
-    # LJ non-bonded interactions
-    nlist = hoomd.md.nlist.Cell(buffer=0.5) # buffer impacts performance, not correctness, with default other settings!
-    dpd = hoomd.md.pair.DPD(nlist, kT=kT, default_r_cut=dpd_rcut)
-    dpd.params = dpdParam
-    
-    # integrator
-    nve = hoomd.md.methods.NVE(filter=hoomd.filter.All())
-    integrator = hoomd.md.Integrator(dt=0.005, methods=nve, forces=[fenewca, dpd])
-    sim.operations.integrator = integrator
-
-    if ftraj!=None:
-        # write trajectory
-        add_write_trajectory(sim, period, ftraj)
-
-    if fstruct!=None:
-        # write final state
-        add_write_state(sim, iterations, fstruct)
-
-    # table logger
-    add_table_log(sim, period, writeTiming=True, writeThermo=True)
-    
-    sim.run(iterations)
-
-    return sim.state.get_snapshot()
-
 def run_GAUSSIAN_FENE(initial_state, device, kT, prefactor_range, feneParam, iterations, fname=None):
     sim = hoomd.Simulation(device=device, seed=1)
     sim.create_state_from_snapshot(initial_state)
@@ -410,8 +283,10 @@ def run_GAUSSIAN_FENE(initial_state, device, kT, prefactor_range, feneParam, ite
     integrator = hoomd.md.Integrator(dt=0.005, methods=[langevin], forces=[fenewca, gaussian])
     sim.operations.integrator = integrator
 
-    # table logger
-    add_table_log(sim, 5000, writeTiming=True, writeThermo=True)
+    # add table logging
+    thermo = custom.Thermo(sim)
+    tablelogger = basic_logger(sim, thermo)
+    add_table_log(sim, 5000, tablelogger)
 
     # write final state
     if fname!=None:
@@ -446,15 +321,27 @@ def setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, f
     integrator = hoomd.md.Integrator(dt=0.005, methods=methods, forces=[fenewca, lj])
     sim.operations.integrator = integrator
 
+    # loggable computes
+    thermo = custom.Thermo(sim)
+    conformation = compute_mol_conformation(sim, period)
+
+    # (mostly) complete log
+    trajlog = hoomd.logging.Logger()
+    trajlog += thermo
+    trajlog += conformation
+    trajlog.add(sim, ['timestep'])
+
+    # full logger
     if ftraj!=None:
         # write trajectory
-        add_write_trajectory(sim, period, ftraj)
+        add_write_trajectory(sim, period, ftraj, logger=trajlog)
 
     if fstruct!=None:
         # write final state
         add_write_state(sim, iterations, fstruct)
 
-    # add table logger
-    add_table_log(sim, period, writeTiming=True, writeThermo=True)
+    # add table logging
+    tablelogger = basic_logger(sim, thermo)
+    add_table_log(sim, period, tablelogger)
     
     return sim
