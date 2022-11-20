@@ -120,7 +120,7 @@ def interfacial_tension_IK(dat, edges, axis):
 
     if isinstance(dat, gsd.hoomd.HOOMDTrajectory):
         ts = [dat[i].log["Simulation/timestep"] for i in range(len(dat))]
-        func = lambda t: overlap_integral(t, edges=edges,axis=axis) # to pass non-iterable argument
+        func = lambda t: interfacial_tension_IK(t, edges=edges,axis=axis) # to pass non-iterable argument
         return ts, list(map(func, dat))
     
     # gamma is interfacial tension and will be computed via integration
@@ -133,16 +133,36 @@ def interfacial_tension_IK(dat, edges, axis):
 
     return gamma
 
-def ensemble_average_thermo(dat):
-    log = dat[0].log
+def interfacial_tension_global(dat, axis):
+
+    # dat is a hoomdtrajectory or frame containing log data
+    # axis is the axis normal to the interface(s)
+
+    if isinstance(dat, gsd.hoomd.HOOMDTrajectory):
+        ts = [dat[i].log["Simulation/timestep"] for i in range(len(dat))]
+        func = lambda t: interfacial_tension_global(t,axis=axis) # to pass non-iterable argument
+        return ts, list(map(func, dat))
+    
+    # gamma is interfacial tension and will be computed via integration
+    p_tensor = dat.log['Thermo/pressure_tensor']
+    pT_indices = [0, 3, 5]
+    pN_idx = pT_indices.pop(axis)
+    pdiff = p_tensor[:,pN_idx] - 1/2 * np.sum(p_tensor[:,pT_indices],axis=1)
+    gamma = L * pdiff # WHAT IS L??? how to log...
+
+    return gamma
+
+
+def ensemble_average_log(dat):
+    avglog = dat[0].log
     nframe = len(dat)
 
     for frame in dat[1:]:
         for key,val in frame.log.items():
-            log[key] += val
+            avglog[key] += val
     
-    for key,val in log.items():
-        log[key] = val/nframe
+    for key,val in avglog.items():
+        avglog[key] = val/nframe
 
-    return log
+    return avglog
     
