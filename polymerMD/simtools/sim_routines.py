@@ -5,7 +5,7 @@ import itertools
 
 def compute_mol_conformation(sim: hoomd.Simulation, period: int):
 
-    cluster = custom.getBondedClusters(sim.state) # notice, this could be any set of clusters!
+    cluster = custom.getBondedClusters(sim.state.get_snapshot()) # notice, this could be any set of clusters!
     conformation = custom.Conformation(cluster)
     updater = hoomd.write.CustomWriter(action=conformation.updater,
                                         trigger=hoomd.trigger.Periodic(period))

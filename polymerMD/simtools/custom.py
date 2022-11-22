@@ -209,8 +209,9 @@ class ClusterPropertiesUpdater(hoomd.custom.Action):
         return
             
     def act(self, timestep):
-        box = freud.box.Box.from_box(self._state.configuration.box)
-        self._clprops.compute((box,self._state.particles.position),self._clidx)
+        box = freud.box.Box.from_box(self._state.box)
+        with self._state.cpu_local_snapshot as snap:
+            self._clprops.compute((box, snap.particles.position),self._clidx)
         return
 
 class Conformation(metaclass=hoomd.logging.Loggable):
