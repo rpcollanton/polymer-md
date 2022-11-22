@@ -5,7 +5,6 @@ import freud
 import datetime
 import numpy as np
 
-# basic functions
 def getBondedClusters(state):
         cluster = freud.cluster.Cluster()
         # get bond indices

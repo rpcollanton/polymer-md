@@ -133,22 +133,22 @@ def interfacial_tension_IK(dat, edges, axis):
 
     return gamma
 
-def interfacial_tension_global(dat, axis):
+def interfacial_tension_global(dat, axis, L):
 
     # dat is a hoomdtrajectory or frame containing log data
     # axis is the axis normal to the interface(s)
 
     if isinstance(dat, gsd.hoomd.HOOMDTrajectory):
         ts = [dat[i].log["Simulation/timestep"] for i in range(len(dat))]
-        func = lambda t: interfacial_tension_global(t,axis=axis) # to pass non-iterable argument
+        func = lambda t: interfacial_tension_global(t,axis=axis, L=L) # to pass non-iterable argument
         return ts, list(map(func, dat))
     
     # gamma is interfacial tension and will be computed via integration
-    p_tensor = dat.log['Thermo/pressure_tensor']
+    p_tensor = dat.log['polymerMD/simtools/custom/Thermo/pressure_tensor'] # ew.
     pT_indices = [0, 3, 5]
     pN_idx = pT_indices.pop(axis)
-    pdiff = p_tensor[:,pN_idx] - 1/2 * np.sum(p_tensor[:,pT_indices],axis=1)
-    gamma = L * pdiff # WHAT IS L??? how to log...gg
+    pdiff = p_tensor[pN_idx] - 1/2 * np.sum(p_tensor[pT_indices])
+    gamma = L * pdiff # WHAT IS L??? how to log...
 
     return gamma
 
@@ -163,5 +163,7 @@ def ensemble_average_log(dat):
     for key,val in avglog.items():
         avglog[key] = val/nframe
 
+    # remove temporal things
+    # avglog.pop("Simulation/timestep",0) # remove in a way that is safe if it doesn't exist? 
+
     return avglog
-    

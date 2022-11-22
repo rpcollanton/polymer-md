@@ -47,7 +47,9 @@ def basic_logger(sim: hoomd.Simulation, thermo: custom.Thermo):
 
 def add_table_log(sim: hoomd.Simulation, period: int, logger: hoomd.logging.Logger):
 
-    table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(period=period),logger=logger)
+    table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(period=period), 
+                              logger=logger,
+                              max_header_len=10)
     sim.operations.writers.append(table)
 
     return
