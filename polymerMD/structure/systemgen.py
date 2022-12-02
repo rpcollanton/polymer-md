@@ -174,6 +174,10 @@ def build_snapshot(system, type='random', regions=[], regioncenters=[]):
     elif type == 'boxregions':
         if len(regions)==0 or len(regioncenters)==0:
             raise ValueError("No regions specified.")
+        if len(regions) != len(regioncenters):
+            raise ValueError("Lengths of regions and region centers don't match.")
+        if len(regions) != system.nComponents:
+            raise ValueError("Number of regions do not match number of components.") 
         pos = systemCoordsBoxRegions(system, regions, regioncenters)
 
     # get particle indices, types, and type ids
