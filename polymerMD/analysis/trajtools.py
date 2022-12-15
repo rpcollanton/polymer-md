@@ -148,7 +148,7 @@ def interfacial_tension_global(dat, axis, L):
     pT_indices = [0, 3, 5]
     pN_idx = pT_indices.pop(axis)
     pdiff = p_tensor[pN_idx] - 1/2 * np.sum(p_tensor[pT_indices])
-    gamma = L * pdiff # WHAT IS L??? how to log...
+    gamma = L * pdiff / 2 # Assume there are two interfaces
 
     return gamma
 
