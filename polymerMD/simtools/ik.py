@@ -33,20 +33,25 @@ class ThermoIKUpdater(hoomd.custom.Action):
     def act(self, timestep):
         with self._state.cpu_local_snapshot as snap: 
             # update pair neighbor lists
-            self._thermoIK.BinnedPairs.updateBinnedLists(snap.particles.position, self._nlistPair)
+            with self._nlistPair.cpu_local_nlist_arrays as nlist_arrays:
+                self._thermoIK.BinnedPairs.updateBinnedLists(snap.particles.position, nlist_arrays)
 
             # update bond neighbor lists
             self._thermoIK.BinnedBonds.updateBinnedLists(snap.particles.position, snap.bonds.members)
 
             # re-compute spatial thermo
-            self._thermoIK.compute(snap.particles.position)
+            self._thermoIK.compute()
         return
 
 class ThermoIK(metaclass=hoomd.logging.Loggable):
 
     def __init__(self, sim: hoomd.Simulation, nbins: int, axis: int):
-        # keep a reference o the simulation
+        # keep a reference to the simulation
         self.sim = sim
+
+        # store binned axis index and number of bins along that axis
+        self._nbins = nbins
+        self._axis = axis
 
         # create binned neighbor list objects to be updated later
         self.BinnedNListPairs = BinnedNeighborLists(nbins, axis, sim.state.box)
@@ -54,8 +59,8 @@ class ThermoIK(metaclass=hoomd.logging.Loggable):
 
         # create thermoIKUpdater, passing this object into it. assume pair force is the second element
         # This will be an action added to a custom writer and added to sim.operations.writers, see ik.add_thermo_ik
-        nlistPairs = sim.operations.integrator.forces[1].nlist.cpu_local_nlist_arrays
-        self.updater = ThermoIKUpdater(self, nlistPairs)
+        nlistPair = sim.operations.integrator.forces[1].nlist
+        self.updater = ThermoIKUpdater(self, nlistPair)
 
         # spatial pressure tensor, to be updated.
         self._spatial_pressure_tensor = np.zeros((self.nbins,6))
@@ -67,6 +72,15 @@ class ThermoIK(metaclass=hoomd.logging.Loggable):
         # virial stuff here
         # where to get force calculations? HOOMD... nvm, only gives force on each particle, not contribution from different particles
         # where to get positions? do we take these as input from updater or use reference to sim? 
+
+        # for each bin:
+            # convert pair neighbor list to hoomd format lol
+            # call Pair.compute_virial_pressure method that I wrote
+            # pass binned bond list in good format :) 
+            # call Bond.compute_virial_pressure method that needs to be written
+            # add pair/bond contributions together, divide by cross-sectional area
+            # for diagonal pressure tensor elements, add
+        # add them 
 
         # updates self._spatial_pressure_tensor!! 
         return
