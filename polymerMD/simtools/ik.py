@@ -170,10 +170,7 @@ class BinnedNeighborLists:
                 # add pair to the neighbor list of every bin between the two bins
                 # determine beginning and end of range of bins to add particle too
                 # this pair is considered a neighbor by hoomd, so we don't need to check if they are close enough to interact!
-                start = min((bin_i,bin_j))
-                stop = max((bin_i,bin_j))+1
-                temprange = list(range(stop,start))
-                for bin_idx in temprange:
+                for bin_idx in self._getBinsBetween(bin_i, bin_j, self._nbins):
                     self._nListStagers[bin_idx].add_pair((i,j), dist_ij)
         
         # after adding all pairs, build neighbor lists
@@ -204,16 +201,24 @@ class BinnedNeighborLists:
             bin_j = particle_bins[j]-1
             dist_ij = np.sqrt(np.sum(np.square(positions[j,:]-positions[i,:])))
             # add pair to each bin between the two bins
-            start = min((bin_i,bin_j))
-            stop = max((bin_i,bin_j))+1
-            temprange = list(range(stop,start))
-            for bin_idx in temprange:
+            for bin_idx in self._getBinsBetween(bin_i, bin_j, self._nbins):
                 self._nListStagers[bin_idx].add_pair((i,j), dist_ij)
         
         # after adding all pairs, build neighbor lists
         self._nLists = [stager.build_nlist(len(positions)) for stager in self._nListStagers]
 
         return
+    
+    def _getBinsBetween(self, i: int, j: int, n: int):
+        # i and j are bin indices, could be greater or lesser
+        # n is the number of bins
+        l = min((i,j)) # lower bin
+        u = max((i,j)) # upper bin
+        if (u-l) < (l+n-u):
+            binsbtwn = list(range(l,u+1))
+        else:
+            binsbtwn = list(range(u,n)) + list(range(0,l+1))
+        return binsbtwn
 
     @property 
     def nlists(self):
