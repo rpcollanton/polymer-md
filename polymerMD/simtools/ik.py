@@ -4,120 +4,26 @@ from hoomd.logging import log
 import freud
 import numpy as np
 
+# helper functions
+def convertNeighborListHoomdToFreud(nlist: hoomd.md.data.NeighborListLocalAccess):
+    # write this if necessary
+    return
 
-class Slice1DFilter(hoomd.filter.CustomFilter):
+def convertNeighborListFreudToHoomd(nlist: freud.locality.NeighborList):
+    # write this if necessary
+    return
 
-    def __init__(self,axis,min_coord,max_coord):
-        # axis can be 0 1 2 or 'x' 'y' 'z'
-        if isinstance(axis,str):
-            if not axis.isnumeric():
-                # convert to numeric
-                conv = {'x':0, 'y':1, 'z':2}
-                axis = conv[axis]
-            else:
-                axis = int(axis)
-        self._axis = axis
-        self._min = min_coord
-        self._max = max_coord
-    
-    def __hash__(self):
-        return hash((self._axis, self._min, self._max))
-    
-    def __eq__(self,other):
-        return (isinstance(other,Slice1DFilter)
-                and self._axis == other._axis
-                and self._min == other._min
-                and self._max == other._max)
-    
-    def __call__(self,state):
-        with state.cpu_local_snapshot as snap:
-            pos = snap.particles.position
-            indices = np.logical_and(pos[:,self._axis] > self._min, pos[:,self._axis] < self._max)
-            return np.copy(snap.particles.tag[indices])
+def add_thermo_ik(sim: hoomd.Simulation, period: int, axis: int, nbins: int, flog: str, fedge: str):
+    # write this, following as a guide compute_mol_conformation and add_filtered_thermo
+    return
 
-class Thermo1DSpatial(metaclass=hoomd.logging.Loggable):
+# classes
 
-    def __init__(self, sim: hoomd.Simulation, filters: List[Slice1DFilter]):
-        self.sim = sim
-        self.filters = filters # filter updaters should be created elsewhere, wherever the period of the logger is defined
-        self.nslice = len(filters)
+class ThermoIKUpdater(hoomd.custom.Action): 
 
-        # create the list of thermodynamic quantity computes
-        self.thermos = []
-        for f in filters:
-            self.thermos.append(hoomd.md.compute.ThermodynamicQuantities(filter=f))
-            self.sim.operations.computes.append(self.thermos[-1])
-
-        # store the axis along which this is being computed
-        self.axis = filters[0]._axis
-        for f in filters:
-            if f._axis != self.axis:
-                ValueError("Axes in 1D filters do not match.")
-
-        # store the left and right coordinates of each slice 
-        # I don't love this because Thermo1DSpatial isn't managing the updating of these filters, and so in principle they
-        # could be out of date!! Particles in each filter might no longer be in the slices...
-        # one solution could be to make this class just deal with thermo properties for a list of corresponding filters,
-        # and some other class (or function?) responsible for updating the filters and saving the coordinates
-        # also we don't need to log the coordinates at each step??? 
-        # hmmmmmmmmmmmmmmmmmmmmmmmmmmm yeah no.
-        # self.edges = np.zeros((self.nslice,2))
-        # for i,f in enumerate(filters):
-        #     self.edges[i,0] = f._min
-        #     self.edges[i,1] = f._max
-
-        return
-    
-    @log(category='sequence')
-    def spatial_pressure_xx(self):
-        if self.sim.timestep == 0:
-            return [0]*self.nslice
-        return [t.pressure_tensor[0] for t in self.thermos] # xx component of pressure tensor
-    
-    @log(category='sequence')
-    def spatial_pressure_yy(self):
-        if self.sim.timestep == 0:
-            return [0]*self.nslice
-        return [t.pressure_tensor[3] for t in self.thermos] # yy component of pressure tensor
-    
-    @log(category='sequence')
-    def spatial_pressure_zz(self):
-        if self.sim.timestep == 0:
-            return [0]*self.nslice
-        return [t.pressure_tensor[5] for t in self.thermos] # zz component of pressure tensor
-
-    @log(category='sequence')
-    def spatial_pressure_tensor(self):
-        p = np.zeros((self.nslice,6))
-        if self.sim.timestep == 0:
-            return p
-        for i,t in enumerate(self.thermos):
-            p[i,:] = np.array(t.pressure_tensor)
-        return p
-    
-    @log(category='sequence')
-    def spatial_potential_energy(self):
-        if self.sim.timestep == 0:
-            return [0]*self.nslice
-        return [t.potential_energy for t in self.thermos]
-    
-    @log(category='sequence')
-    def spatial_kinetic_energy(self):
-        if self.sim.timestep == 0:
-            return [0]*self.nslice
-        return [t.kinetic_energy for t in self.thermos]
-    
-    @log(category='sequence')
-    def spatial_temperature(self):
-        if self.sim.timestep == 0:
-            return [0]*self.nslice
-        return [t.kinetic_temperature for t in self.thermos]
-
-class ClusterPropertiesUpdater(hoomd.custom.Action):
-
-    def __init__(self,cluster,clprops):
-        self._clprops = clprops
-        self._clidx = cluster.cluster_idx
+    def __init__(self, thermoIK, nlistPair):
+        self._thermoIK = thermoIK
+        self._nlistPair = nlistPair
         return
     
     def attach(self, simulation):
@@ -125,25 +31,49 @@ class ClusterPropertiesUpdater(hoomd.custom.Action):
         return
             
     def act(self, timestep):
-        box = freud.box.Box.from_box(self._state.box)
-        with self._state.cpu_local_snapshot as snap:
-            self._clprops.compute((box, snap.particles.position),self._clidx)
+        with self._state.cpu_local_snapshot as snap: 
+            # update pair neighbor lists
+            self._thermoIK.BinnedPairs.updateBinnedLists(snap.particles.position, self._nlistPair)
+
+            # update bond neighbor lists
+            self._thermoIK.BinnedBonds.updateBinnedLists(snap.particles.position, snap.bonds.members)
+
+            # re-compute spatial thermo
+            self._thermoIK.compute(snap.particles.position)
         return
 
-class PressureSpatial(metaclass=hoomd.logging.Loggable):
+class ThermoIK(metaclass=hoomd.logging.Loggable):
 
-    def __init__(self, cluster: freud.cluster.Cluster):
-        # initialize cluster, which will be a group of particles (i.e. bonded particles)
-        self._cl = cluster
-        # create cluster properties object. 
-        # This will be updated by a ClusterPropertiesUpdater
-        self._clprop = freud.cluster.ClusterProperties()
-        self.updater = ClusterPropertiesUpdater(self._cl, self._clprop)
+    def __init__(self, sim: hoomd.Simulation, nbins: int, axis: int):
+        # keep a reference o the simulation
+        self.sim = sim
+
+        # create binned neighbor list objects to be updated later
+        self.BinnedNListPairs = BinnedNeighborLists(nbins, axis, sim.state.box)
+        self.BinnedNListBonds = BinnedNeighborLists(nbins, axis, sim.state.box)
+
+        # create thermoIKUpdater, passing this object into it. assume pair force is the second element
+        # This will be an action added to a custom writer and added to sim.operations.writers, see ik.add_thermo_ik
+        nlistPairs = sim.operations.integrator.forces[1].nlist.cpu_local_nlist_arrays
+        self.updater = ThermoIKUpdater(self, nlistPairs)
+
+        # spatial pressure tensor, to be updated.
+        self._spatial_pressure_tensor = np.zeros((self.nbins,6))
+
         return
     
-    @log
-    def avgRg(self):
-        return np.mean(self._clprop.radii_of_gyration)
+    def compute():
+
+        # virial stuff here
+        # where to get force calculations? HOOMD... nvm, only gives force on each particle, not contribution from different particles
+        # where to get positions? do we take these as input from updater or use reference to sim? 
+
+        # updates self._spatial_pressure_tensor!! 
+        return
+
+    @log(category='sequence')
+    def spatial_pressure_tensor(self):
+        return self._spatial_pressure_tensor
 
 class nListStager:
 
@@ -175,7 +105,7 @@ class nListStager:
         self._distances.append(distance)
         return
 
-class BinsIK:
+class BinnedNeighborLists:
 
     def __init__(self, nBins: int, axis: int, box: hoomd.Box): 
         # nunber of bins and dimension along which bins are created
@@ -190,23 +120,25 @@ class BinsIK:
 
         # create list of member and neighbor lists for each bin
         self._members = [[] for i in range(nBins)]
-        self._nListStagers = [nListStager() for i in range(nBins)] # each list will contain pairs of particles that are neighbors 
-        # CREATE class to set up for freud NeighborList from_arrays class method. make self._neighborArrays a list of those classes
-        # this class should have a N_points, point indices, and distances according to what from_arrays needs
-        # this class should also have a "build freud list" method that will correctly use the arrays to build the list
-        # call from_arrays at the end of updateLists and then store the resulting neighborList objecvts in the _neighborlist member array
-        # use list comprehension to do all this
-        # give class a reset method to wipe out arrays, call these at beginning of updateLists
+        self._nListStagers = [nListStager() for i in range(nBins)] 
         self._nLists = [] # created once neighbor arrays are populated
-
         return
 
-    def updateLists(self, positions: np.ndarray, nlist_arrays: hoomd.md.data.NeighborListLocalAccess):
-        # positions is an array (N_particlesx3) of coordinates. Get from 
-        # neighbors is a neighbor list in the hoomd format, class hoomd.md.data.NeighborListLocalAccess
+    def updateBinnedLists(self, positions: np.ndarray, nlist):
+        # choose which function to call based on the type of inputted neighbor list to be binned
+        if isinstance(nlist, hoomd.md.data.NeighborListLocalAccess):
+            self._updateLists_hoomd(positions, nlist)
+        elif isinstance(nlist, List[List[int]]):
+            self._updateLists_array(positions, nlist)
+        elif isinstance(nlist, freud.locality.NeighborList):
+            self._updateLists_freud(positions, nlist)
+        return
+
+    def _updateLists_hoomd(self, positions: np.ndarray, nlist_arrays: hoomd.md.data.NeighborListLocalAccess):
+        # positions - an array (N_particlesx3) of coordinates. Get from 
+        # neighbors - a neighbor list in the hoomd format, class hoomd.md.data.NeighborListLocalAccess
         # NOTE: get neighbors from sim.operations.integrator.forces[**THE PAIR POTENTIAL**]
         # in my code the pair potential is always index 1, and the bonded potential index 0
-        # NOTE: may need to consider the case (which would be weird) that the potential is 
 
         # is this a full or half neighbor list?
         isFull = not nlist_arrays.half_nlist
@@ -242,13 +174,47 @@ class BinsIK:
                 stop = max((bin_i,bin_j))+1
                 temprange = list(range(stop,start))
                 for bin_idx in temprange:
-                    particle_bins[bin_idx].add_pair((i,j), dist_ij)
+                    self._nListStagers[bin_idx].add_pair((i,j), dist_ij)
         
         # after adding all pairs, build neighbor lists
         self._nLists = [stager.build_nlist(len(positions)) for stager in self._nListStagers]
 
         return
     
+    def _updateLists_freud(self, positions: np.ndarray, nlist: freud.locality.NeighborList):
+        # TO BE WRITTEN! don't need it yet
+        return
+
+    def _updateLists_array(self, positions: np.ndarray, bonds: hoomd.data.array):
+
+        # reset stored neighbor arrays
+        for stager in self._nListStagers:
+            stager.reset()
+
+        # determine the bin each particle belongs to. Note, first bin has index 1 from np.digitize
+        particle_bins = np.digitize(positions[:,self._axis], self._edges)
+
+        # loop over bonds
+        for bondedpair in bonds:
+            # indices of particles participating in this bond
+            i = bondedpair[0]
+            j = bondedpair[1]
+            # indices of bins that these two particles are in
+            bin_i = particle_bins[i]-1
+            bin_j = particle_bins[j]-1
+            dist_ij = np.sqrt(np.sum(np.square(positions[j,:]-positions[i,:])))
+            # add pair to each bin between the two bins
+            start = min((bin_i,bin_j))
+            stop = max((bin_i,bin_j))+1
+            temprange = list(range(stop,start))
+            for bin_idx in temprange:
+                self._nListStagers[bin_idx].add_pair((i,j), dist_ij)
+        
+        # after adding all pairs, build neighbor lists
+        self._nLists = [stager.build_nlist(len(positions)) for stager in self._nListStagers]
+
+        return
+
     @property 
     def nlists(self):
         return self._nLists
