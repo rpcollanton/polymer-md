@@ -1,5 +1,6 @@
 import hoomd
 from polymerMD.simtools import custom
+from polymerMD.simtools import ik
 import numpy as np
 import itertools
 
@@ -54,7 +55,7 @@ def add_table_log(sim: hoomd.Simulation, period: int, logger: hoomd.logging.Logg
 
     return
 
-def add_spatial_thermo(sim: hoomd.Simulation, period: int, axis: int, nbins: int, flog: str, fedge: str):
+def add_filtered_thermo(sim: hoomd.Simulation, period: int, axis: int, nbins: int, flog: str, fedge: str):
 
     Lmin = -sim.state.box.L[axis]/2
     Lmax = +sim.state.box.L[axis]/2
@@ -225,7 +226,7 @@ def production(initial_state, device, epsAB, kT, iterations, period=None, fstruc
 
     return sim.state.get_snapshot()
 
-def run_spatial_thermo(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, fthermo=None, fedge=None, nBins = 40, axis=0):
+def run_filtered_thermo(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, fthermo=None, fedge=None, nBins = 40, axis=0):
 
     # force field parameters
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
@@ -253,13 +254,13 @@ def run_spatial_thermo(initial_state, device, epsAB, kT, iterations, period=None
     sim.operations.updaters.append(zeromomentum)
 
     if fthermo!=None:
-        add_spatial_thermo(sim, period, axis, nBins, fthermo, fedge)
+        add_filtered_thermo(sim, period, axis, nBins, fthermo, fedge)
     
     sim.run(iterations)
 
     return sim.state.get_snapshot()
 
-def output_spatial_thermo(initial_state, epsAB, kT, axis, nbins, fthermo, fedge):
+def output_filtered_thermo(initial_state, epsAB, kT, axis, nbins, fthermo, fedge):
 
     device = hoomd.device.CPU()
     iterations = 1
@@ -282,7 +283,7 @@ def output_spatial_thermo(initial_state, epsAB, kT, axis, nbins, fthermo, fedge)
 
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
                             fstruct=None, ftraj=None)
-    add_spatial_thermo(sim, iterations, axis, nbins, fthermo, fedge)
+    add_filtered_thermo(sim, iterations, axis, nbins, fthermo, fedge)
     
     sim.run(iterations)
 

@@ -216,7 +216,7 @@ class ClusterPropertiesUpdater(hoomd.custom.Action):
 class Conformation(metaclass=hoomd.logging.Loggable):
 
     def __init__(self, cluster: freud.cluster.Cluster):
-        # initialize
+        # initialize cluster, which will be a group of particles (i.e. bonded particles)
         self._cl = cluster
         # create cluster properties object. 
         # This will be updated by a ClusterPropertiesUpdater
