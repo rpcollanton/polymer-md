@@ -14,8 +14,32 @@ def convertNeighborListFreudToHoomd(nlist: freud.locality.NeighborList):
     return
 
 def add_thermo_ik(sim: hoomd.Simulation, period: int, axis: int, nbins: int, flog: str, fedge: str):
-    # write this, following as a guide compute_mol_conformation and add_filtered_thermo
-    return
+    # create ThermoIK compute object and associated updater
+    thermoIK = ThermoIK(sim, nbins, axis)
+    trigger = hoomd.trigger.Periodic(period)
+    updater = hoomd.write.CustomWriter(action=thermoIK.updater, trigger=trigger)
+    sim.operations.writers.append(updater)
+
+    # create ik spatial pressure logger and store basic simulation info
+    logger = hoomd.logging.Logger(categories=['scalar', 'sequence'])
+    logger.add(sim, ['timestep'])
+
+    # store spatial IK information
+    logger[('ThermoIK', 'spatial_pressure_tensor')] = (thermoIK, "spatial_pressure_tensor", 'sequence')
+
+    # create IK thermo gsd log file
+    log_writer = hoomd.write.GSD(filename=flog, trigger=trigger, mode='wb', filter=hoomd.filter.Null())
+    log_writer.log = logger
+    sim.operations.writers.append(log_writer)
+
+    # write edges to a file!
+    # put edges on correct axis, 0s for other axis
+    # assumes edges won't be changing throughout...
+    alledges = np.zeros((nbins+1,3))
+    alledges[:,axis] = thermoIK.BinnedNListPairs.edges
+    np.savetxt(fedge, alledges)
+
+    return thermoIK
 
 # classes
 
@@ -34,10 +58,10 @@ class ThermoIKUpdater(hoomd.custom.Action):
         with self._state.cpu_local_snapshot as snap: 
             # update pair neighbor lists
             with self._nlistPair.cpu_local_nlist_arrays as nlist_arrays:
-                self._thermoIK.BinnedPairs.updateBinnedLists(snap.particles.position, nlist_arrays)
+                self._thermoIK.BinnedNListPairs.updateBinnedLists(snap.particles.position, nlist_arrays)
 
             # update bond neighbor lists
-            self._thermoIK.BinnedBonds.updateBinnedLists(snap.particles.position, snap.bonds.members)
+            self._thermoIK.BinnedNListBonds.updateBinnedLists(snap.particles.position, snap.bonds.group)
 
             # re-compute spatial thermo
             self._thermoIK.compute()
@@ -47,15 +71,15 @@ class ThermoIK(metaclass=hoomd.logging.Loggable):
 
     def __init__(self, sim: hoomd.Simulation, nbins: int, axis: int):
         # keep a reference to the simulation
-        self.sim = sim
+        self._sim = sim
 
         # store binned axis index and number of bins along that axis
         self._nbins = nbins
         self._axis = axis
 
         # create binned neighbor list objects to be updated later
-        self.BinnedNListPairs = BinnedNeighborLists(nbins, axis, sim.state.box)
-        self.BinnedNListBonds = BinnedNeighborLists(nbins, axis, sim.state.box)
+        self.BinnedNListPairs = BinnedNeighborLists(nbins, axis, self._sim.state.box)
+        self.BinnedNListBonds = BinnedNeighborLists(nbins, axis, self._sim.state.box)
 
         # create thermoIKUpdater, passing this object into it. assume pair force is the second element
         # This will be an action added to a custom writer and added to sim.operations.writers, see ik.add_thermo_ik
@@ -63,24 +87,37 @@ class ThermoIK(metaclass=hoomd.logging.Loggable):
         self.updater = ThermoIKUpdater(self, nlistPair)
 
         # spatial pressure tensor, to be updated.
-        self._spatial_pressure_tensor = np.zeros((self.nbins,6))
+        self._spatial_pressure_tensor = np.zeros((self._nbins,6))
 
+        # pre-compute things to reduce computation
+        self._pre_compute()
         return
     
-    def compute():
+    def _pre_compute(self):
+        self._divA = self._sim.state.box.L[self._axis]/np.product(self._sim.state.box.L)
+        return
+    
+    def compute(self):
+
+        # get kT from the simulation's current state
+        kT = self._sim.operations.computes[0].kinetic_temperature
+
+        # smeared average density function from freud, to be evaluated at each box's midpoint
+        # gaussian density?
 
         # virial stuff here
         # where to get force calculations? HOOMD... nvm, only gives force on each particle, not contribution from different particles
         # where to get positions? do we take these as input from updater or use reference to sim? 
 
-        # for each bin:
+        # for each bin i:
             # convert pair neighbor list to hoomd format lol
             # call Pair.compute_virial_pressure method that I wrote
             # pass binned bond list in good format :) 
             # call Bond.compute_virial_pressure method that needs to be written
             # add pair/bond contributions together, divide by cross-sectional area
-            # for diagonal pressure tensor elements, add
-        # add them 
+            # for diagonal pressure tensor elements, add the kinetic/density contribution. (compute with freud.density.GaussianDensity) 
+            # rho(z) * kT (get kT from somewhere...)
+            # add and update bin i, self._spatial_pressure_tensor[i,:]!
 
         # updates self._spatial_pressure_tensor!! 
         return
@@ -130,7 +167,7 @@ class BinnedNeighborLists:
         self._L = box.L[axis]
 
         # bin edge points
-        self._edges = np.linspace(-self._L/2,+self._L/2,self._nBins+1)
+        self._edges = np.linspace(-self._L/2,+self._L/2,self._nbins+1)
 
         # create list of member and neighbor lists for each bin
         self._members = [[] for i in range(nBins)]
@@ -142,10 +179,10 @@ class BinnedNeighborLists:
         # choose which function to call based on the type of inputted neighbor list to be binned
         if isinstance(nlist, hoomd.md.data.NeighborListLocalAccess):
             self._updateLists_hoomd(positions, nlist)
-        elif isinstance(nlist, List[List[int]]):
-            self._updateLists_array(positions, nlist)
         elif isinstance(nlist, freud.locality.NeighborList):
             self._updateLists_freud(positions, nlist)
+        else: # assume it is an array. recall error with using isinstance with List[List[int]] "subscripting of generics"
+            self._updateLists_array(positions, nlist)
         return
 
     def _updateLists_hoomd(self, positions: np.ndarray, nlist_arrays: hoomd.md.data.NeighborListLocalAccess):
