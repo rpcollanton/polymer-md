@@ -102,6 +102,11 @@ class ThermoIK(metaclass=hoomd.logging.Loggable):
         # get kT from the simulation's current state
         kT = self._sim.operations.computes[0].kinetic_temperature
 
+        # virial contribution from pair interaction (add bond later) for each bin
+        for i in range(self.BinnedNListPairs._nbins):
+            vir = self._divA * self._sim.operations.integrator.forces[1].compute_virial_pressure_contribution(self.BinnedNListPairs._nLists[i], self._axis)
+            self._spatial_pressure_tensor[i,:] += vir
+
         # smeared average density function from freud, to be evaluated at each box's midpoint
         # gaussian density?
 
