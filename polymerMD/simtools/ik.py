@@ -123,31 +123,16 @@ class ThermoIK(metaclass=hoomd.logging.Loggable):
             # print("virPair: " + str(virPair))
             # print("virBond: " + str(virBond))
 
-            self._spatial_pressure_tensor[i,:] += self._divA * (virPair + virBond)
+            self._spatial_pressure_tensor[i,:] += (virPair + virBond)
             #print(self._spatial_pressure_tensor)
 
+        print("Kinetic: ", kinetic_p)
+        print("VirPair: ", virPair)
+        print("VirBond: ", virBond)
         # print averaged from my calculation at this frame
         print("Average IK: ", 1/self._nbins*np.sum(self._spatial_pressure_tensor,axis=0))
         print("HOOMD Result: ", self._sim.operations.computes[0].pressure_tensor)
         
-        # smeared average density function from freud, to be evaluated at each box's midpoint
-        # gaussian density?
-
-        # virial stuff here
-        # where to get force calculations? HOOMD... nvm, only gives force on each particle, not contribution from different particles
-        # where to get positions? do we take these as input from updater or use reference to sim? 
-
-        # for each bin i:
-            # convert pair neighbor list to hoomd format lol
-            # call Pair.compute_virial_pressure method that I wrote
-            # pass binned bond list in good format :) 
-            # call Bond.compute_virial_pressure method that needs to be written
-            # add pair/bond contributions together, divide by cross-sectional area
-            # for diagonal pressure tensor elements, add the kinetic/density contribution. (compute with freud.density.GaussianDensity) 
-            # rho(z) * kT (get kT from somewhere...)
-            # add and update bin i, self._spatial_pressure_tensor[i,:]!
-
-        # updates self._spatial_pressure_tensor!! 
         return
 
     @log(category='sequence')
