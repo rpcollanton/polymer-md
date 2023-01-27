@@ -28,16 +28,18 @@ def add_thermo_ik(sim: hoomd.Simulation, period: int, axis: int, nbins: int, flo
     logger[('ThermoIK', 'spatial_pressure_tensor')] = (thermoIK, "spatial_pressure_tensor", 'sequence')
 
     # create IK thermo gsd log file
-    log_writer = hoomd.write.GSD(filename=flog, trigger=trigger, mode='wb', filter=hoomd.filter.Null())
-    log_writer.log = logger
-    sim.operations.writers.append(log_writer)
+    if flog:
+        log_writer = hoomd.write.GSD(filename=flog, trigger=trigger, mode='wb', filter=hoomd.filter.Null())
+        log_writer.log = logger
+        sim.operations.writers.append(log_writer)
 
     # write edges to a file!
     # put edges on correct axis, 0s for other axis
     # assumes edges won't be changing throughout...
-    alledges = np.zeros((nbins+1,3))
-    alledges[:,axis] = thermoIK.BinnedNListPairs.edges
-    np.savetxt(fedge, alledges)
+    if fedge:
+        alledges = np.zeros((nbins+1,3))
+        alledges[:,axis] = thermoIK.BinnedNListPairs.edges
+        np.savetxt(fedge, alledges)
 
     return thermoIK
 
@@ -103,35 +105,25 @@ class ThermoIK(metaclass=hoomd.logging.Loggable):
         self._spatial_pressure_tensor = np.zeros((self._nbins,6))
 
         # get kT from the simulation's current state
-        kT = self._sim.operations.computes[0].kinetic_temperature
+        Ktrans = self._sim.operations.computes[0].translational_kinetic_energy/1000
 
         # virial contribution from pair interaction (add bond later) for each bin
         for i in range(self.BinnedNListPairs._nbins):
             # Kinetic contribution to the pressure, proportional to temperature and local density
             numdens = self._divbinVol*self.BinnedNListPairs._bincount[i] # maybe gaussian smear this later?
-            kinetic_p = kT*numdens # need to ensemble average this separately!!!?
-            self._spatial_pressure_tensor[i,0] += kinetic_p
-            self._spatial_pressure_tensor[i,3] += kinetic_p
-            self._spatial_pressure_tensor[i,5] += kinetic_p
+            kinetic_p = 2/3*Ktrans*numdens # need to ensemble average this separately!!!?
+            self._spatial_pressure_tensor[i,0] = kinetic_p
+            self._spatial_pressure_tensor[i,3] = kinetic_p
+            self._spatial_pressure_tensor[i,5] = kinetic_p
 
             edge0 = self.BinnedNListPairs.edges[i]
             edge1 = self.BinnedNListPairs.edges[i+1]
 
             # Bond and pair virial contributions to the pressure
-            virPair = self._divA*self._sim.operations.integrator.forces[1].compute_virial_pressure_contribution(self.BinnedNListPairs.nlists[i], self._axis, edge0, edge1)
-            virBond = self._divA*self._sim.operations.integrator.forces[0].compute_virial_pressure_contribution(self.BinnedBonds.bondlists[i], self._axis, edge0, edge1)
-            # print("virPair: " + str(virPair))
-            # print("virBond: " + str(virBond))
+            virPair = self._sim.operations.integrator.forces[1].compute_virial_pressure_contribution(self.BinnedNListPairs.nlists[i], self._axis, edge0, edge1)
+            virBond = self._sim.operations.integrator.forces[0].compute_virial_pressure_contribution(self.BinnedBonds.bondlists[i], self._axis, edge0, edge1)
 
-            self._spatial_pressure_tensor[i,:] += (virPair + virBond)
-            #print(self._spatial_pressure_tensor)
-
-        print("Kinetic: ", kinetic_p)
-        print("VirPair: ", virPair)
-        print("VirBond: ", virBond)
-        # print averaged from my calculation at this frame
-        print("Average IK: ", 1/self._nbins*np.sum(self._spatial_pressure_tensor,axis=0))
-        print("HOOMD Result: ", self._sim.operations.computes[0].pressure_tensor)
+            self._spatial_pressure_tensor[i,:] += self._divA*(virPair + virBond)
         
         return
 
@@ -290,6 +282,7 @@ class BinnedNeighborLists:
                 bin_j = particle_bins[j]-1 # shift so that first bin has index of 0           
 
                 # calculate distance here. it will be faster to only calculate it once regardless of the number of bins!
+                # note: this could be wrong!! it could not consider the minimum image... but it is unused
                 dist_ij = np.sqrt(np.sum(np.square(positions[j,:]-positions[i,:])))     
                 
                 # add pair to the neighbor list of every bin between the two bins
