@@ -124,7 +124,7 @@ def interfacial_tension_IK(dat, edges, axis):
         return ts, list(map(func, dat))
     
     # gamma is interfacial tension and will be computed via integration
-    p_tensor = dat.log['Thermo1DSpatial/spatial_pressure_tensor']
+    p_tensor = dat.log['ThermoIK/spatial_pressure_tensor']
     pT_indices = [0, 3, 5]
     pN_idx = pT_indices.pop(axis)
     integrand = p_tensor[:,pN_idx] - 1/2 * np.sum(p_tensor[:,pT_indices],axis=1)
