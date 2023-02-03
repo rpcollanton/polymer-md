@@ -219,7 +219,7 @@ def production(initial_state, device, epsAB, kT, iterations, period=None, fstruc
                             fstruct=fstruct, ftraj=ftraj, flog=flog)
     
     # add momentum zeroer! approximately freeze system in place, no bulk motion allowed
-    zeromomentum = hoomd.md.update.ZeroMomentum(hoomd.trigger.Periodic(100))
+    zeromomentum = hoomd.md.update.ZeroMomentum(hoomd.trigger.Periodic(50))
     sim.operations.updaters.append(zeromomentum)
     
     sim.run(iterations)
@@ -251,7 +251,7 @@ def production_IK(initial_state, device, epsAB, kT, iterations, period=None,
                             fstruct=fstruct, ftraj=ftraj, flog=flog)
     
     # add momentum zeroer! approximately freeze system in place, no bulk motion allowed.
-    zeromomentum = hoomd.md.update.ZeroMomentum(hoomd.trigger.Periodic(100))
+    zeromomentum = hoomd.md.update.ZeroMomentum(hoomd.trigger.Periodic(50))
     sim.operations.updaters.append(zeromomentum)
 
     # add thermo IK compute
