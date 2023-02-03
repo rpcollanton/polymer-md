@@ -128,8 +128,7 @@ def interfacial_tension_IK(dat, edges, axis):
     pT_indices = [0, 3, 5]
     pN_idx = pT_indices.pop(axis)
     integrand = p_tensor[:,pN_idx] - 1/2 * np.sum(p_tensor[:,pT_indices],axis=1)
-
-    gamma = np.trapz(integrand,edges[:-1,axis])
+    gamma = np.trapz(integrand,edges[:-1])
 
     return gamma
 
