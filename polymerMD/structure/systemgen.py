@@ -162,7 +162,7 @@ def getBondTypes(system):
 
     return bonds, bondtypes, bondtypeid
 
-def build_snapshot(system, type='random', regions=[], regioncenters=[]):
+def build_snapshot(system, type='random', regions=[], regioncenters=[],verbose=False):
 
     # get system box size, total number of particles, 
     box = system.box
@@ -199,8 +199,7 @@ def build_snapshot(system, type='random', regions=[], regioncenters=[]):
     snapshot.bonds.typeid = bondtypeid
     snapshot.bonds.group = bondgroup
 
-    debugging = True
-    if debugging:
+    if verbose:
         print("Number of particles:             N = {:d}".format(N))
         print("Number of positions:             pos.shape[0] = {:d}".format(pos.shape[0]))
         print("Number of particle types:        len(types) = {:d}".format(len(types)))
