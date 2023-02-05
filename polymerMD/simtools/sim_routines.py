@@ -94,7 +94,7 @@ def add_filtered_thermo(sim: hoomd.Simulation, period: int, axis: int, nbins: in
 
     return logger, alledges
 
-def remove_overlaps(initial_state, device, kT, prefactor_range, iterations, fname):
+def remove_overlaps(initial_state, device, kT, prefactor_range, iterations, fname=None):
 
     # bonded interactions
     feneParam = dict(k=60.0, r0=1.5, epsilon=0.0, sigma=1.0, delta=0.0)
@@ -122,7 +122,7 @@ def relax_overlaps(initial_state, device, iterations, fname=None):
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=fname)
     sim.run(iterations)
     
-    return sim.state.get_snapshot()
+    return sim.state
 
 def relax_overlaps_AB(initial_state, device, epsAB, iterations, fname=None):
 
@@ -149,7 +149,7 @@ def relax_overlaps_AB(initial_state, device, epsAB, iterations, fname=None):
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=fname)
     sim.run(iterations)
     
-    return sim.state.get_snapshot()
+    return sim.state
 
 def equilibrate(initial_state, device, kT, iterations, fstruct, ftraj):
 
@@ -169,9 +169,9 @@ def equilibrate(initial_state, device, kT, iterations, fstruct, ftraj):
                             fstruct=fstruct, ftraj=ftraj)
     sim.run(iterations)
     
-    return sim.state.get_snapshot()
+    return sim.state
 
-def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct, ftraj=None):
+def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct=None, ftraj=None):
 
     # force field parameters
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
@@ -193,7 +193,7 @@ def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct, ftraj=
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
                             fstruct=fstruct, ftraj=ftraj)
     sim.run(iterations)
-    return sim.state.get_snapshot()
+    return sim.state
 
 def production(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, flog=None):
 
@@ -224,7 +224,7 @@ def production(initial_state, device, epsAB, kT, iterations, period=None, fstruc
     
     sim.run(iterations)
 
-    return sim.state.get_snapshot()
+    return sim.state
 
 def production_IK(initial_state, device, epsAB, kT, iterations, period=None, 
                   fstruct=None, ftraj=None, flog=None, fthermo=None, fedge=None, nbins=40, axis=0):
@@ -259,7 +259,7 @@ def production_IK(initial_state, device, epsAB, kT, iterations, period=None,
     
     sim.run(iterations)
 
-    return sim.state.get_snapshot()
+    return sim.state
 
 def run_filtered_thermo(initial_state, device, epsAB, kT, iterations, period=None, 
                         fstruct=None, ftraj=None, fthermo=None, fedge=None, nBins = 40, axis=0):
@@ -294,7 +294,7 @@ def run_filtered_thermo(initial_state, device, epsAB, kT, iterations, period=Non
     
     sim.run(iterations)
 
-    return sim.state.get_snapshot()
+    return sim.state
 
 def output_filtered_thermo(initial_state, epsAB, kT, axis, nbins, fthermo, fedge):
 
@@ -323,7 +323,7 @@ def output_filtered_thermo(initial_state, epsAB, kT, axis, nbins, fthermo, fedge
     
     sim.run(iterations)
 
-    return sim.state.get_snapshot()
+    return sim.state
 
 def run_GAUSSIAN_FENE(initial_state, device, kT, prefactor_range, feneParam, iterations, fname=None):
     sim = hoomd.Simulation(device=device, seed=1)
@@ -372,7 +372,7 @@ def run_GAUSSIAN_FENE(initial_state, device, kT, prefactor_range, feneParam, ite
     
     sim.run(iterations-sim.timestep) # remaining iterations
 
-    return sim.state.get_snapshot()
+    return sim.state
 
 def setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=None, ftraj=None, flog=None):
     sim = hoomd.Simulation(device=device, seed=1)
