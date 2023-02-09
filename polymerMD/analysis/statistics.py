@@ -19,7 +19,7 @@ def estimate_autocorrelation_time(A: np.ndarray):
     variance_A = np.var(A,axis=0)
 
     # number of blocks for each sample
-    nblocks = list(range(10,51,5))
+    nblocks = list(range(5,100,5))
     y_variance_estimate = np.zeros((len(nblocks),) + shape_A_sample)    # lhs of variance equation
     x_adjusted_variance = np.zeros((len(nblocks),) + shape_A_sample)    # rhs of variance equation without slope
 
