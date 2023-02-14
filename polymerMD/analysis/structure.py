@@ -44,11 +44,11 @@ def meanSqInternalDist(snapshot):
     
     # get cluster
     cluster = getBondedClusters(snapshot)
-    clSize = [len(cl) for cl in cluster.cluster_keys]
-
+    nCluster = len(cluster.cluster_keys)
+    
     # find max length, initialize
-    avgRsq = np.zeros((clSize,1))
-    count = np.zeros((clSize,1))
+    avgRsq = np.zeros((nCluster,1))
+    count = np.zeros((nCluster,1))
 
     # loop over clusters
     for cl in cluster.cluster_keys:
