@@ -50,6 +50,22 @@ def estimate_autocorrelation_time(A: np.ndarray):
 
     return tau
 
+def num_independent_samples(A: np.ndarray):
+    '''
+    Args:
+        A (np.ndarray): Array of dimension (n x d) where n is the number of samples and 
+                        d is the dimensionality of the property A. Must be evenly spaced.
+
+    Returns:
+        nsamples (int):  Number of independent samples based on estimated autocorrelation time
+    '''
+
+    t_total = np.shape(A)[0]
+    tau_A = estimate_autocorrelation_time(A)
+    nsamples = t_total/(2*tau_A)
+    
+    return nsamples
+
 def estimator_variance(A: np.ndarray): 
     '''
     Args:
@@ -63,12 +79,9 @@ def estimator_variance(A: np.ndarray):
     
     # variance over entire simulation
     variance_A = np.var(A,axis=0)
-    
-    # estimated autocorrelation time
-    tau_A = estimate_autocorrelation_time(A)
 
     # compute estimator variance
-    t_total = np.shape(A)[0]
-    sigma = 2*tau_A / t_total * variance_A
+    nsamples = num_independent_samples(A)
+    sigma = variance_A / nsamples
 
     return sigma
