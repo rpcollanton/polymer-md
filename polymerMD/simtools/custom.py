@@ -5,23 +5,23 @@ import freud
 import datetime
 import numpy as np
 
-def getBondedClusters(state):
-        cluster = freud.cluster.Cluster()
-        # get bond indices
-        idx_querypts = []
-        idx_pts = []
-        for bond in state.bonds.group:
-            idx_querypts.append(bond[0])
-            idx_pts.append(bond[1])
+def getBondedClusters(snapshot):
+    cluster = freud.cluster.Cluster()
+    # get bond indices
+    idx_querypts = []
+    idx_pts = []
+    for bond in snapshot.bonds.group:
+        idx_querypts.append(bond[0])
+        idx_pts.append(bond[1])
 
-        box = freud.box.Box.from_box(state.configuration.box)
-        dist = box.compute_distances(state.particles.position[idx_querypts], 
-                                     state.particles.position[idx_pts])
-        N = state.particles.N
-        bondedneighbors = freud.locality.NeighborList.from_arrays(N, N, idx_querypts, idx_pts, dist)
-        cluster.compute(state,neighbors=bondedneighbors)
+    box = freud.box.Box.from_box(snapshot.configuration.box)
+    dist = box.compute_distances(snapshot.particles.position[idx_querypts], 
+                                    snapshot.particles.position[idx_pts])
+    N = snapshot.particles.N
+    bondedneighbors = freud.locality.NeighborList.from_arrays(N, N, idx_querypts, idx_pts, dist)
+    cluster.compute(snapshot,neighbors=bondedneighbors)
 
-        return cluster
+    return cluster
 
 # classes
 class Slice1DFilter(hoomd.filter.CustomFilter):
