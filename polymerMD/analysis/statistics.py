@@ -85,3 +85,23 @@ def estimator_variance(A: np.ndarray):
     sigma = variance_A / nsamples
 
     return sigma
+
+def get_independent_samples(A,factor=1):
+    '''
+    Args:
+        A (np.ndarray): Array of dimension (n x d) where n is the number of samples and 
+                        d is the dimensionality of the property A. Must be evenly spaced.
+        
+        factor (int):   Factor by which to extend the samples. Default is 1
+
+    Returns:
+        samples (float):  Estimated variance of the finite-length average of A based on 
+                        the estimated autocorrelation time
+    '''
+
+    # compute number of samples
+    nsamples = num_independent_samples(A)/factor
+    samplesize = int(np.shape(A)[0]/nsamples)
+    samples = np.array([np.mean(A[i*samplesize:(i+1)*samplesize]) for i in range(int(nsamples))])
+
+    return samples
