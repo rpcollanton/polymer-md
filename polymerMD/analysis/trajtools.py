@@ -1,8 +1,8 @@
 import gsd.hoomd
 import gsd.pygsd
 import numpy as np
-import scipy as sp
 from polymerMD.analysis import utility
+from polymerMD.structure import systemspec
 
 # analysis functions
 def density_system(f):
@@ -18,13 +18,14 @@ def density_system(f):
 
     return N/V
 
-def density_profile_1D(f, nBins=100, axis=0):
+def density_1D_monomers(f, nBins=100, axis=0, method='smoothed'):
     # f is a trajectory or trajectory frame
     # axis is the axis to plot the density along. averaged over other two
 
     if isinstance(f, gsd.hoomd.HOOMDTrajectory):
         ts = [f[i].configuration.step for i in range(len(f))]
-        return ts, list(map(density_profile_1D, f))
+        func = lambda t: density_1D_monomers(t, nBins=nBins, axis=axis)
+        return ts, list(map(func, f))
 
     box = f.configuration.box[0:3]
     particleCoord = f.particles.position
@@ -35,11 +36,49 @@ def density_profile_1D(f, nBins=100, axis=0):
     for i,type in enumerate(types):
         mask = particleTypeID==i
         coords = particleCoord[mask,:]
-        hists[type] = utility.binned_density_1D(coords, box, axis, nBins)
+        if method=='smoothed':
+            hists[type] = utility.smoothed_density_1D(coords, box, axis, nBins)
+        elif method=='binned':
+            hists[type] = utility.binned_density_1D(coords, box, axis, nBins)
 
     # modify histograms so that sum over species in each bin is 1. IE: convert to vol frac
     hists = utility.count_to_volfrac(hists)
 
+    return hists
+
+def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='smoothed'):
+    # f is a trajectory or a trajectory frame
+    # system is a SystemSpec object describing the topology and composition of the system
+    # nBins is the number of bins to use to compute the density
+    # axis is the axis to plot the density along. Density effectively averaged over the other two.
+
+    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+        ts = [f[i].configuration.step for i in range(len(f))]
+        func = lambda t: density_1D_species(t, system, nBins=nBins, axis=axis)
+        return ts, list(map(func, f))
+
+    # get geometric information
+    box = f.configuration.box[0:3]
+    particleCoord = f.particles.position
+
+    # note: should optimize in future because this does not take advantage of the fact that system
+    # topology is not changing from frame to frame! will recompute system labels/indices every time
+    types = list(set(system.componentlabels))
+    particleSpeciesTypes = np.array([types.index(type) for type in system.particleSpeciesTypes()])
+
+    hists = {}
+    for i,type in enumerate(types):
+        mask = particleSpeciesTypes==i
+        print(type, sum(mask))
+        coords = particleCoord[mask,:]
+        if method=='smoothed':
+            hists[type] = utility.smoothed_density_1D(coords, box, axis, nBins)
+        elif method=='binned':
+            hists[type] = utility.binned_density_1D(coords, box, axis, nBins)
+    
+    # modify histograms so that sum over species in each bin is 1. IE: convert to vol frac
+    hists = utility.count_to_volfrac(hists)
+    
     return hists
 
 def volfrac_fields(f, nBins=None):

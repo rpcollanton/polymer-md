@@ -64,13 +64,17 @@ def meanSqInternalDist(snapshot):
             for j in range(minkey,i):
                 points1.append(i)
                 points2.append(j)
+
+    # compute distances
     distances = box.compute_distances(snapshot.particles.position[points1], snapshot.particles.position[points2])
     distancesSquared = np.square(distances)
     for dsq,(i,j) in zip(distancesSquared,zip(points1,points2)):
         avgRsq[i-j] += dsq
         count[i-j] += 1
+    
     # compute average, and remove the 0 element
     avgRsq[1:] = avgRsq[1:]/count[1:]
     n = np.arange(1,len(avgRsq)+1)
     avgRsq = avgRsq[1:]
+
     return n,avgRsq

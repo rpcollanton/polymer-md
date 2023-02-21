@@ -1,8 +1,7 @@
 import gsd.hoomd
 import gsd.pygsd
 import numpy as np
-import matplotlib.pyplot as plt
-from pathlib import Path
+from scipy import stats
 
 # utility functions
 def read_traj_from_gsd(fname):
@@ -33,6 +32,37 @@ def binned_density_1D(coord, box, axis, nBins):
     h = (h[0] / binvol, h[1])
 
     return h
+
+def smoothed_density_1D(coord, box, axis, nBins):
+    # given a set of coordinates (and a box that those coordinates should all fall within, centered on origin),
+    # compute the gaussian smoothed density along the specified axis!
+
+    lmin = 0 - box[axis]/2
+    lmax = 0 + box[axis]/2
+
+    locs = coord[:,axis]
+    nparticles = np.shape(locs)[0]
+    scale = (lmax-lmin)/50 # might need to adjust 
+    dists = [stats.norm(loc = loc, scale = scale) for loc in locs]
+
+    nedges = nBins+1
+    xbins = np.linspace(lmin,lmax,nedges)
+    dens = np.zeros_like(xbins[:-1])
+    for dist in dists:
+        dens += dist.pdf(xbins[:-1])/nparticles
+
+    # account for periodic boundary conditions!
+    xpbc = np.zeros_like(xbins)
+    for i in range(nedges):
+        if xbins[i] > 0:
+            xpbc[i] = xbins[i]-box[axis]
+        elif xbins[i] <= 0:
+            xpbc[i] = xbins[i]+box[axis]
+    for dist in dists:
+        dens += dist.pdf(xpbc[:-1])/nparticles
+        
+
+    return (dens,xbins) # tuple to be consistent with binned density histograms
 
 def binned_density_ND(coord, box, N, nBins):
 
