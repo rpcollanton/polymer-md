@@ -105,7 +105,7 @@ class LinearPolymerSpec:
 class Component:
 
     def __init__(self, species, N):
-        self.species = species
+        self.species = species # uses setter! wow, fancy
         self.N = N
         return
 
@@ -117,6 +117,10 @@ class Component:
     def species(self, molspec):
         self._species = molspec
         return
+    
+    @property
+    def label(self):
+        return self._species.label
     
     @property 
     def N(self):
@@ -169,13 +173,18 @@ class System:
     def components(self):
         return self._components
     
+    @property
+    def componentlabels(self):
+        return self._componentlabels
+    
     def addComponent(self, species, N):
         self.components.append(Component(species, N))
         self._componentlabels.append(species.label)
         return self.components[-1]
     
-    def componentByLabel(self,label):
-        return self.components[self._componentlabels.index(label)]
+    # This should not be used because components can have identical labels!
+    # def componentByLabel(self,label):
+    #     return self.components[self._componentlabels.index(label)]
     
     @property
     def nMonomers(self):
@@ -214,7 +223,7 @@ class System:
         while count < N:
             idx_component += 1
             count += self.components[idx_component].numparticles
-        count -= self.components[idx_component].numparticles 
+        count -= self.components[idx_component].numparticles # undo the last step because it overshot N
         # Note: count will finish being equal to the number of particles preceding this component
 
         # find the idx on the species chain
@@ -229,7 +238,7 @@ class System:
 
         # returns the monomer associated with this block
         return self.components[idx_component].species.blocks[idx_block].monomer
-    
+
     def particleTypes(self):
         # returns a list of all particle types in order
         # faster than running particleType for each particle
@@ -243,6 +252,33 @@ class System:
 
         return types
     
+    def particleSpeciesTypes(self):
+        # returns a list of the type of species a particle is a part of, for all particles
+        
+        types = []
+        for component in self.components:
+            for i in range(component.N):
+                for block in component.species.blocks:
+                    for j in range(block.length):
+                        types.append(component.label)
+        
+        return types
+    
+    def speciesTypes(self):
+        # returns a list of all species types (defined by their labels)
+        types = []
+        for component in self.components:
+            for i in range(component.N):
+                types.append(component.label)
+        
+        return types
+    
+    def indicesBySpecies(self):
+        # returns a list of lists where each list corresponds with a given species
+        # contains the indices of all particles in that polymer
+
+        return 
+
     def bonds(self):
 
         bonds = []
