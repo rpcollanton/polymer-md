@@ -44,39 +44,25 @@ def meanSqInternalDist(snapshot):
     
     # get cluster
     cluster = getBondedClusters(snapshot)
+    clSize = [len(cl) for cl in cluster.cluster_keys]
     nCluster = len(cluster.cluster_keys)
-    
+
     # find max length, initialize
-    avgRsq = np.zeros((nCluster,1))
-    count = np.zeros((nCluster,1))
+    maxLength = max(clSize)
+    avgRsq = np.zeros((maxLength))
+    count = np.zeros((maxLength))
 
     # loop over clusters
-    for cl in cluster.cluster_keys:
+    for numitr,cl in enumerate(cluster.cluster_keys):
+        if not numitr % 100:
+            print("{:d}/{:d}".format(numitr,nCluster))
         minkey = min(cl)
         maxkey = max(cl)
         idxrange = list(range(minkey,maxkey+1))
         distances = box.compute_all_distances(snapshot.particles.position[idxrange], snapshot.particles.position[idxrange])
         for i in idxrange:
             for j in range(minkey,i):
-                avgRsq[i-j] += distances[i,j]**2
+                avgRsq[i-j] += distances[i-minkey,j-minkey]**2
                 count[i-j] += 1
-        
-    avgRsq = avgRsq/count
-
+    avgRsq[1:] = avgRsq[1:]/count[1:]
     return avgRsq
-        
-
-                
-
-    
-
-    # assume indices correspond to relative position on chain.. could change with bridging technique! (or for bridging technique just switch all positions)
-    
-    # store separation of pair in avgRsq[i-j] for i > j
-    # increment count[i-j] by 1
-
-    # divide avgRsq[i] by count[i] to average
-    
-    # return avgRsq
-
-    return
