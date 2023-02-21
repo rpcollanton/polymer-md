@@ -44,25 +44,44 @@ def meanSqInternalDist(snapshot):
     
     # get cluster
     cluster = getBondedClusters(snapshot)
-    clSize = [len(cl) for cl in cluster.cluster_keys]
-    nCluster = len(cluster.cluster_keys)
-
+    
     # find max length, initialize
+    clSize = [len(cl) for cl in cluster.cluster_keys] # number of particles in each cluster
     maxLength = max(clSize)
     avgRsq = np.zeros((maxLength))
     count = np.zeros((maxLength))
 
-    # loop over clusters
+    # loop over clusters and identify indices of distances to compute
+    # goal is to make one and only one call to the box to compute distances
+    nCluster = len(cluster.cluster_keys)
+    points1 = []
+    points2 = []
+    print("Finding points...")
     for numitr,cl in enumerate(cluster.cluster_keys):
-        if not numitr % 100:
-            print("{:d}/{:d}".format(numitr,nCluster))
         minkey = min(cl)
         maxkey = max(cl)
         idxrange = list(range(minkey,maxkey+1))
-        distances = box.compute_all_distances(snapshot.particles.position[idxrange], snapshot.particles.position[idxrange])
         for i in idxrange:
             for j in range(minkey,i):
-                avgRsq[i-j] += distances[i-minkey,j-minkey]**2
-                count[i-j] += 1
+                points1.append(i)
+                points2.append(j)
+    
+    print("Computing distances...")
+    distances = box.compute_distances(snapshot.particles.position[points1], snapshot.particles.position[points2])
+    for d,(i,j) in zip(distances,zip(points1,points2)):
+        avgRsq[i-j].append += d
+        count[i-j] += 1
+
+    # for numitr,cl in enumerate(cluster.cluster_keys):
+    #     if not numitr % 100:
+    #         print("{:d}/{:d}".format(numitr,nCluster))
+    #     minkey = min(cl)
+    #     maxkey = max(cl)
+    #     idxrange = list(range(minkey,maxkey+1))
+    #     distances = box.compute_all_distances(snapshot.particles.position[idxrange], snapshot.particles.position[idxrange])
+    #     for i in idxrange:
+    #         for j in range(minkey,i):
+    #             avgRsq[i-j] += distances[i-minkey,j-minkey]**2
+    #             count[i-j] += 1
     avgRsq[1:] = avgRsq[1:]/count[1:]
     return avgRsq
