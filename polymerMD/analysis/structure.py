@@ -56,7 +56,6 @@ def meanSqInternalDist(snapshot):
     nCluster = len(cluster.cluster_keys)
     points1 = []
     points2 = []
-    print("Finding points...")
     for numitr,cl in enumerate(cluster.cluster_keys):
         minkey = min(cl)
         maxkey = max(cl)
@@ -65,23 +64,10 @@ def meanSqInternalDist(snapshot):
             for j in range(minkey,i):
                 points1.append(i)
                 points2.append(j)
-    
-    print("Computing distances...")
     distances = box.compute_distances(snapshot.particles.position[points1], snapshot.particles.position[points2])
-    for d,(i,j) in zip(distances,zip(points1,points2)):
-        avgRsq[i-j].append += d
+    distancesSquared = np.square(distances)
+    for dsq,(i,j) in zip(distancesSquared,zip(points1,points2)):
+        avgRsq[i-j] += dsq
         count[i-j] += 1
-
-    # for numitr,cl in enumerate(cluster.cluster_keys):
-    #     if not numitr % 100:
-    #         print("{:d}/{:d}".format(numitr,nCluster))
-    #     minkey = min(cl)
-    #     maxkey = max(cl)
-    #     idxrange = list(range(minkey,maxkey+1))
-    #     distances = box.compute_all_distances(snapshot.particles.position[idxrange], snapshot.particles.position[idxrange])
-    #     for i in idxrange:
-    #         for j in range(minkey,i):
-    #             avgRsq[i-j] += distances[i-minkey,j-minkey]**2
-    #             count[i-j] += 1
     avgRsq[1:] = avgRsq[1:]/count[1:]
     return avgRsq
