@@ -69,5 +69,8 @@ def meanSqInternalDist(snapshot):
     for dsq,(i,j) in zip(distancesSquared,zip(points1,points2)):
         avgRsq[i-j] += dsq
         count[i-j] += 1
+    # compute average, and remove the 0 element
     avgRsq[1:] = avgRsq[1:]/count[1:]
-    return avgRsq
+    n = np.arange(1,len(avgRsq)+1)
+    avgRsq = avgRsq[1:]
+    return n,avgRsq
