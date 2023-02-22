@@ -42,7 +42,7 @@ def smoothed_density_1D(coord, box, axis, nBins):
 
     locs = coord[:,axis]
     nparticles = np.shape(locs)[0]
-    scale = (lmax-lmin)/50 # might need to adjust 
+    scale = (lmax-lmin)/75 # might need to adjust 
     dists = [stats.norm(loc = loc, scale = scale) for loc in locs]
 
     nedges = nBins+1

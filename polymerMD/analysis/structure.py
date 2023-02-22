@@ -78,3 +78,7 @@ def meanSqInternalDist(snapshot):
     avgRsq = avgRsq[1:]
 
     return n,avgRsq
+
+def meanSqInternalDistSpecies():
+
+    return
