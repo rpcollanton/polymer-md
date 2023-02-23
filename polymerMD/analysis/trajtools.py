@@ -1,10 +1,29 @@
 import gsd.hoomd
 import gsd.pygsd
 import numpy as np
-from polymerMD.analysis import utility
+from polymerMD.analysis import utility, structure
 from polymerMD.structure import systemspec
+import freud
 
 # analysis functions
+def getBondedClusters(snapshot):
+    cluster = freud.cluster.Cluster()
+    # get bond indices
+    idx_querypts = []
+    idx_pts = []
+    for bond in snapshot.bonds.group:
+        idx_querypts.append(bond[0])
+        idx_pts.append(bond[1])
+
+    box = freud.box.Box.from_box(snapshot.configuration.box)
+    dist = box.compute_distances(snapshot.particles.position[idx_querypts], 
+                                    snapshot.particles.position[idx_pts])
+    N = snapshot.particles.N
+    bondedneighbors = freud.locality.NeighborList.from_arrays(N, N, idx_querypts, idx_pts, dist)
+    cluster.compute(snapshot,neighbors=bondedneighbors)
+
+    return cluster
+
 def density_system(f):
     # f is a trajectory or trajectory frame
     
@@ -59,18 +78,17 @@ def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='
 
     # get geometric information
     box = f.configuration.box[0:3]
-    particleCoord = f.particles.position
 
     # note: should optimize in future because this does not take advantage of the fact that system
     # topology is not changing from frame to frame! will recompute system labels/indices every time
-    types = list(set(system.componentlabels))
+    types = list(set(system.componentlabels)) # some components might have same label. Treat them as identical
     particleSpeciesTypes = np.array([types.index(type) for type in system.particleSpeciesTypes()])
 
     hists = {}
     for i,type in enumerate(types):
         mask = particleSpeciesTypes==i
         print(type, sum(mask))
-        coords = particleCoord[mask,:]
+        coords = f.particles.position[mask,:]
         if method=='smoothed':
             hists[type] = utility.smoothed_density_1D(coords, box, axis, nBins)
         elif method=='binned':
@@ -80,6 +98,51 @@ def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='
     hists = utility.count_to_volfrac(hists)
     
     return hists
+
+def internaldistances_all(f):
+
+    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+        ts = [f[i].configuration.step for i in range(len(f))]
+        func = lambda t: internaldistances_all(t)
+        return ts, list(map(func, f))
+    
+    # get box information
+    box = freud.box.Box.from_box(f.configuration.box)
+    
+    # get cluster
+    cluster = getBondedClusters(f)
+
+    # compute and return
+    n,avgRsq = structure.meanSqInternalDist(f.particles.position, cluster.cluster_keys, box)
+
+    return n, avgRsq
+
+def internaldistances_species(f, system: systemspec.System):
+
+    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+        ts = [f[i].configuration.step for i in range(len(f))]
+        func = lambda t: internaldistances_species(t, system)
+        return ts, list(map(func, f))
+    
+    # get box information
+    box = freud.box.Box.from_box(f.configuration.box)
+
+    # get information about which molecule is which type
+    types = list(set(system.componentlabels)) # some components might have same label. Treat them as identical
+    molSpeciesTypes = np.array([types.index(type) for type in system.speciesTypes()])
+    molIndices = system.indicesByMolecule()
+
+    speciesRsq = {}
+    for i,type in enumerate(types):
+        # pull out the molecules just of this type
+        mask = molSpeciesTypes==i
+        molOfType = [molIndices[idx] for idx,isType in enumerate(mask) if isType]
+        # compute avg internal distances over these molecules. pass all position because indices will be 
+        # maintained as relative to the entire system, so can't slice position without changing mol indices
+        n,avgRsq = structure.meanSqInternalDist(f.particles.position, molOfType, box)
+        speciesRsq[type] = (n,avgRsq)
+
+    return speciesRsq
 
 def volfrac_fields(f, nBins=None):
 
