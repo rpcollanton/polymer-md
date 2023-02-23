@@ -87,7 +87,6 @@ def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='
     hists = {}
     for i,type in enumerate(types):
         mask = particleSpeciesTypes==i
-        print(type, sum(mask))
         coords = f.particles.position[mask,:]
         if method=='smoothed':
             hists[type] = utility.smoothed_density_1D(coords, box, axis, nBins)
