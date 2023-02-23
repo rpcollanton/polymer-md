@@ -242,6 +242,7 @@ class System:
     def particleTypes(self):
         # returns a list of all particle types in order
         # faster than running particleType for each particle
+        # len(types) = number of particles
 
         types = []
         for component in self.components:
@@ -254,7 +255,8 @@ class System:
     
     def particleSpeciesTypes(self):
         # returns a list of the type of species a particle is a part of, for all particles
-        
+        # len(types) = number of particles
+
         types = []
         for component in self.components:
             for i in range(component.N):
@@ -266,6 +268,7 @@ class System:
     
     def speciesTypes(self):
         # returns a list of all species types (defined by their labels)
+        # len(types) = number of molecules
         types = []
         for component in self.components:
             for i in range(component.N):
@@ -273,11 +276,20 @@ class System:
         
         return types
     
-    def indicesBySpecies(self):
+    def indicesByMolecule(self):
         # returns a list of lists where each list corresponds with a given species
         # contains the indices of all particles in that polymer
+        
+        indices = []
+        idx_current = 0
+        for component in self.components:
+            specieslength = component.species.length
+            for i in range(component.N):
+                molindices = list(range(idx_current,idx_current+specieslength))
+                indices.append(molindices)
+                idx_current += specieslength
 
-        return 
+        return indices
 
     def bonds(self):
 
