@@ -214,6 +214,18 @@ def overlap_integral(f, nBins=None):
 
     return overlaps
 
+def junction_RDF(f, system:systemspec.System, nBins=40, rmax = 5):
+    # get junction centers
+    junctions = system.junctions()
+    pos = np.array([1/2*np.sum(f.particles.position[junc,:],axis=0) for junc in junctions])  
+
+    # compute rdf
+    rdf = freud.density.RDF(nBins,rmax)
+    rdf.compute(f,pos)
+
+    # return bin centers and histogram
+    return rdf.bin_centers, rdf.rdf
+
 def interfacial_tension_IK(dat, edges, axis):
 
     # here, dat is a HOOMDTrajectory/frame containing log data 
@@ -267,3 +279,4 @@ def ensemble_average_log(dat):
     # avglog.pop("Simulation/timestep",0) # remove in a way that is safe if it doesn't exist? 
 
     return avglog
+

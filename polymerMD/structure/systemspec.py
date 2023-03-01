@@ -303,6 +303,17 @@ class System:
                 idx_start += component.species.length
         
         return bonds, bondtypes
+    
+    def junctions(self):
+        junctions = []
+        # junctiontypes = [] could add if needed in future for 3 monomer systems
+        bonds,bondtypes = self.bonds()
+        for bond,bondtype in zip(bonds,bondtypes):
+            monomertypes = bondtype.split("-")
+            if monomertypes[0] != monomertypes[1]:
+                junctions.append(bond)
+        return junctions
+
 
     
 # Workflow:
