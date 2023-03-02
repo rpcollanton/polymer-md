@@ -214,14 +214,29 @@ def overlap_integral(f, nBins=None):
 
     return overlaps
 
-def junction_RDF(f, system:systemspec.System, nBins=40, rmax = 5):
+def junction_RDF_2D(f, system:systemspec.System, axis, nBins=40, rmax = 5):
     # get junction centers
     junctions = system.junctions()
     pos = np.array([1/2*np.sum(f.particles.position[junc,:],axis=0) for junc in junctions])  
 
+    # need to compute and accumulate rdf for two separate interfaces, in 2D.
+    axis_indices = [i for i in range(3) if i!=axis]
+    
+    pos2D_left = pos[np.where(pos[:,axis] < 0)[0],:]
+    pos2D_right = pos[np.where(pos[:,axis] > 0)[0],:]
+    pos2D_left[:,axis] = 0 # set to 0 per freud requirement for 2D boxes
+    pos2D_right[:,axis] = 0
+
+    # swap columns so that coordinates in plane of interface are in x,y positions
+    for i in range(len(axis_indices)):
+        pos2D_left[:,[i,axis_indices[i]]] = pos2D_left[:,[axis_indices[i],i]]
+        pos2D_right[:,[i,axis_indices[i]]] = pos2D_right[:,[axis_indices[i],i]]
+
+    box2D = [f.configuration.box[i] for i in axis_indices]
     # compute rdf
     rdf = freud.density.RDF(nBins,rmax)
-    rdf.compute(f,pos)
+    rdf.compute((box2D,pos2D_left),reset=False)
+    rdf.compute((box2D,pos2D_right),reset=False)
 
     # return bin centers and histogram
     return rdf.bin_centers, rdf.rdf
