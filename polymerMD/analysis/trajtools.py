@@ -248,13 +248,14 @@ def junction_RDF_accumulate(fs, systems, axis, nBins=40, rmax = 5):
 
     # need to compute and accumulate rdf for two separate interfaces, in 2D.
     axis_indices = [i for i in range(3) if i!=axis]
-    
+   
     # for each system to be accumulated into final rdf
     for f,system in zip(fs,systems):
         # get junction centers
         junctions = system.junctions()
+        if not junctions:
+            ValueError("Can not calculate junction RDF for system with no copolymers.")
         pos = np.array([1/2*np.sum(f.particles.position[junc,:],axis=0) for junc in junctions])
-    
         pos2D_left = pos[np.where(pos[:,axis] < 0)[0],:]
         pos2D_right = pos[np.where(pos[:,axis] > 0)[0],:]
         pos2D_left[:,axis] = 0 # set to 0 per freud requirement for 2D boxes
