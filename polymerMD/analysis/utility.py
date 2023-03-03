@@ -19,6 +19,32 @@ def write_gsd_from_snapshot(snapshot, fname):
             f.append(snapshot)
     return
 
+def wrap_coords(coords,boxsize):
+
+    # wrap coordinates into a rectangular box with side lengths given by boxsize
+
+    dims = len(boxsize)
+    if dims > 3:
+        dims = 3
+        boxsize = boxsize[0:3]
+    
+    wrapped = np.zeros_like(coords)
+    for i in range(dims):
+        wrapped[:,i] = coords[:,i] - boxsize[i] * np.rint(coords[:,i]/boxsize[i])
+
+    return wrapped 
+
+def shift_pbc(coords, box, shift):
+    # dimensions need to match
+    # coords N x d, box 1 x d, shift 1 x d
+
+    coords = coords+np.multiply(shift,box)
+    coords = wrap_coords(coords,box)
+
+    return coords
+
+
+
 def binned_density_1D(coord, box, axis, nBins):
     # given a set of coordinates (and a box that those coordinates should all fall within, centered on origin),
     # compute the binned density along the specified axis!
