@@ -274,6 +274,36 @@ def junction_RDF_accumulate(fs, systems, axis, nBins=40, rmax = 5):
     # return rdf object
     return rdf
 
+def junction_density_smeared(f, system: systemspec.System, axis, nBins=500, sigma=4.0):
+    
+    # get system information
+    axis_indices = [i for i in range(3) if i!=axis]
+    box2D = [f.configuration.box[i] for i in axis_indices]
+
+    # get junction positions and convert to 2D for left and right
+    junctions = system.junctions()
+    pos = np.array([1/2*np.sum(f.particles.position[junc,:],axis=0) for junc in junctions])
+    pos2D_left = pos[np.where(pos[:,axis] < 0)[0],:]
+    pos2D_right = pos[np.where(pos[:,axis] > 0)[0],:]
+    pos2D_left[:,axis] = 0 # set to 0 per freud requirement for 2D boxes
+    pos2D_right[:,axis] = 0
+
+    # swap columns so that coordinates in plane of interface are in x,y positions
+    for i in range(len(axis_indices)):
+        pos2D_left[:,[i,axis_indices[i]]] = pos2D_left[:,[axis_indices[i],i]]
+        pos2D_right[:,[i,axis_indices[i]]] = pos2D_right[:,[axis_indices[i],i]]
+    
+    aq_left  = freud.AABBQuery(box2D, pos2D_left)
+    aq_right = freud.AABBQuery(box2D, pos2D_right)
+    gd_left  = freud.density.GaussianDensity(nBins, box2D[0] / 3, sigma)
+    gd_right = freud.density.GaussianDensity(nBins, box2D[0] / 3, sigma)
+    gd_left.compute(aq_left)
+    gd_right.compute(aq_right)
+
+    return gd_left, gd_right
+
+    
+
 def interfacial_tension_IK(dat, edges, axis):
 
     # here, dat is a HOOMDTrajectory/frame containing log data 
