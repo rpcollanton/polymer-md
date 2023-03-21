@@ -151,7 +151,7 @@ def relax_overlaps_AB(initial_state, device, epsAB, iterations, fname=None):
     
     return sim.state
 
-def equilibrate(initial_state, device, kT, iterations, fstruct, ftraj):
+def equilibrate(initial_state, device, kT, iterations, fstruct=None, ftraj=None, flog=None):
 
     # force field parameters
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0)}
@@ -166,7 +166,7 @@ def equilibrate(initial_state, device, kT, iterations, fstruct, ftraj):
     period = 5000
     
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
-                            fstruct=fstruct, ftraj=ftraj)
+                            fstruct=fstruct, ftraj=ftraj, flog=flog)
     sim.run(iterations)
     
     return sim.state

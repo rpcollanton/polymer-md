@@ -95,8 +95,7 @@ def get_independent_samples(A,factor=1):
         factor (int):   Factor by which to extend the samples. Default is 1
 
     Returns:
-        samples (float):  Estimated variance of the finite-length average of A based on 
-                        the estimated autocorrelation time
+        samples (float):    An array of independent samples
     '''
 
     # compute number of samples
@@ -105,3 +104,4 @@ def get_independent_samples(A,factor=1):
     samples = np.array([np.mean(A[i*samplesize:(i+1)*samplesize]) for i in range(int(nsamples))])
 
     return samples
+

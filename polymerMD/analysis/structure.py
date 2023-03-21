@@ -9,6 +9,34 @@ def getAllPairs(maxIdx, minIdx=0):
             pairs.append([i,j])
     return pairs
 
+def meanEndToEnd(coord, molecules, box, power=2):
+    '''
+    Args:
+        coord (np.ndarray):             Nx3 array for the coordinates of N particles
+        molecules (List[List[int]]):    list of indices of particles in each molecule
+        box (freud.box.Box):            box used to compute distances
+        power (float or int):           power to raise distances to inside average         
+    Returns:
+        n (np.ndarray):         1 x max(molecule lengths)-1 containing the corresponding segment lengths
+        avgDistToPower (float): average of end to end distances to inputted power
+    '''
+
+    # loop over molecules and identify indices of distances to compute
+    # this way we only make one call to compute distances.. much faster!
+    points1 = []
+    points2 = []
+    for mol in molecules:
+        points1.append(min(mol))
+        points2.append(max(mol))
+
+    # use box object to compute distances
+    distances = box.compute_distances(coord[points1], coord[points2])
+
+    # average the distances
+    distToPower = np.power(distances,power)
+    avgDistToPower = np.mean(distToPower,axis)
+
+    return avgDistToPower
 
 def meanSqInternalDist(coord, molecules, box):
     '''
