@@ -151,7 +151,7 @@ def relax_overlaps_AB(initial_state, device, epsAB, iterations, fname=None):
     
     return sim.state
 
-def equilibrate(initial_state, device, kT, iterations, fstruct=None, ftraj=None, flog=None):
+def equilibrate(initial_state, device, kT, iterations, period=5000, fstruct=None, ftraj=None, flog=None):
 
     # force field parameters
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0)}
@@ -161,9 +161,6 @@ def equilibrate(initial_state, device, kT, iterations, fstruct=None, ftraj=None,
     # langevin thermostat and integrator
     langevin = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT = kT)
     methods = [langevin]
-
-    # update period
-    period = 5000
     
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
                             fstruct=fstruct, ftraj=ftraj, flog=flog)
@@ -171,7 +168,7 @@ def equilibrate(initial_state, device, kT, iterations, fstruct=None, ftraj=None,
     
     return sim.state
 
-def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct=None, ftraj=None):
+def equilibrate_AB(initial_state, device, epsAB, kT, iterations, period=5000, fstruct=None, ftraj=None):
 
     # force field parameters
     ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
@@ -186,9 +183,6 @@ def equilibrate_AB(initial_state, device, epsAB, kT, iterations, fstruct=None, f
     # langevin thermostat and integrator
     langevin = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT = kT)
     methods = [langevin]
-
-    # update period
-    period = 5000
     
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
                             fstruct=fstruct, ftraj=ftraj)
