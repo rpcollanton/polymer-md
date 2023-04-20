@@ -1,4 +1,26 @@
 import numpy as np
+from abc import ABCMeta, abstractmethod
+
+class Species(metaclass=ABCMeta):
+
+    isPolymer: bool
+
+    # (potentially) non-unique label for molecule 
+    @property
+    @abstractmethod
+    def label(self):
+        pass
+
+    # total number of atoms in molecule, length name inspired by linear polymers
+    @property
+    @abstractmethod
+    def length(self):
+        pass
+
+    @property
+    @abstractmethod
+    def particletypes(self):
+        pass
 
 class MonomerSpec:
 
@@ -34,10 +56,14 @@ class BlockSpec:
         self._length = value
         return
 
-class LinearPolymerSpec:
+    @property
+    def particletypes(self):
+        return [self.monomer.label for i in range(self.length)]
+
+class LinearPolymerSpec(Species):
 
     def __init__(self, monomers, lengths):
-        
+        self.isPolymer = True
         self.nBlocks = len(monomers)
         for i in range(self.nBlocks):
             self._blocks[i].monomer = monomers[i]
@@ -102,9 +128,36 @@ class LinearPolymerSpec:
 
         return bondtypes
 
+    @property
+    def particletypes(self):
+        types = []
+        for block in self.blocks:
+            types += block.particletypes
+        return types
+    
+class MonatomicMoleculeSpec(Species):
+
+    def __init__(self, monomer: MonomerSpec):
+        self.isPolymer = False
+        self._monomer = monomer
+        return
+
+    @property
+    def label(self):
+        return self._monomer.label
+
+    @property
+    def length(self):
+        return int(1)
+    
+    @property
+    def particletypes(self):
+        types = [self.label]
+        return types
+
 class Component:
 
-    def __init__(self, species, N):
+    def __init__(self, species: Species, N: int):
         self.species = species # uses setter! wow, fancy
         self.N = N
         return
@@ -134,6 +187,13 @@ class Component:
     @property
     def numparticles(self):
         return self.N*self.species.length
+
+    @property
+    def particletypes(self):
+        types = []
+        for i in range(self.N):
+            types += self.species.particletypes
+        return types
     
 class Box:
 
@@ -177,12 +237,12 @@ class System:
     def componentlabels(self):
         return self._componentlabels
     
-    def addComponent(self, species, N):
+    def addComponent(self, species: Species, N: int):
         self.components.append(Component(species, N))
         self._componentlabels.append(species.label)
         return self.components[-1]
     
-    # This should not be used because components can have identical labels!
+    # This should not be used because components can have identical labels! Labels are not unique.
     # def componentByLabel(self,label):
     #     return self.components[self._componentlabels.index(label)]
     
@@ -214,30 +274,7 @@ class System:
             N += component.numparticles
         return N
     
-    def particleType(self, N):
-
-        # takes a particle index
-        # finds the right component
-        count = 0
-        idx_component = -1
-        while count < N:
-            idx_component += 1
-            count += self.components[idx_component].numparticles
-        count -= self.components[idx_component].numparticles # undo the last step because it overshot N
-        # Note: count will finish being equal to the number of particles preceding this component
-
-        # find the idx on the species chain
-        idx_species = (N - count) % self.component[idx_component].species.length
-
-        # find the right block
-        count = 0
-        idx_block = -1
-        while count < idx_species:
-            idx_block += 1
-            count += self.components[idx_component].species.blocks[idx_block].length
-
-        # returns the monomer associated with this block
-        return self.components[idx_component].species.blocks[idx_block].monomer
+    # removed particleType(). will probably never be used and is too dependent on the type of species of the component!
 
     def particleTypes(self):
         # returns a list of all particle types in order
@@ -246,10 +283,7 @@ class System:
 
         types = []
         for component in self.components:
-            for i in range(component.N):
-                for block in component.species.blocks:
-                    for j in range(block.length):
-                        types.append(block.monomer.label)
+            types += component.particletypes
 
         return types
     
@@ -259,10 +293,8 @@ class System:
 
         types = []
         for component in self.components:
-            for i in range(component.N):
-                for block in component.species.blocks:
-                    for j in range(block.length):
-                        types.append(component.label)
+            for i in range(component.numparticles):
+                types.append(component.label)
         
         return types
     
@@ -297,6 +329,9 @@ class System:
         bondtypes = []
         idx_start = 0
         for component in self.components:
+            if not component.species.isPolymer: # assuming only polymers have bonds! 
+                idx_start += component.numparticles
+                continue
             for i in range(component.N):
                 bonds += ( np.array(component.species.bonds) + idx_start ).tolist()
                 bondtypes += component.species.bondtypes

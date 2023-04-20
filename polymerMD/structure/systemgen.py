@@ -3,7 +3,6 @@ from . import systemspec
 import gsd.hoomd
 
 def wrap_coords(coords,boxsize):
-
     # wrap coordinates into a rectangular box with side lengths given by boxsize
 
     dims = len(boxsize)
@@ -13,11 +12,16 @@ def wrap_coords(coords,boxsize):
     
     wrapped = np.zeros_like(coords)
     for i in range(dims):
-        wrapped[:,i] = coords[:,i] - boxsize[i] * np.rint(coords[:,i]/boxsize[i])
+        if boxsize[i] == 0:
+            wrapped[:,i] = 0
+        else:
+            wrapped[:,i] = coords[:,i] - boxsize[i] * np.rint(coords[:,i]/boxsize[i])
 
     return wrapped 
 
 def mc_chain_walk(N, l):
+    # montecarlo chain walk with an acceptance condition based on whether the randoomly generated
+    # step results in too much backtracking
 
     PolymerCoords = np.zeros((N,3))
     twostepcutoff = 1.02/0.97 * l
@@ -40,11 +44,14 @@ def mc_chain_walk(N, l):
     return PolymerCoords
 
 def connect_chains(chains, l):
-    
+    # uses the same montecarlo technique to connect already generated set of coordinates.
+    # only checks chain bending in the backward direction, not in the forward direction!
+
     # monte carlo cutoff 
     twostepcutoff = 1.02/0.97 * l
 
     # chains should be a list of numpy arrays of coordinates of polymers
+    # chain is the numpy array of coordinates of the final chain
     chain = chains[0]
     
     for i in range(1,len(chains)):
@@ -83,6 +90,8 @@ def walkComponent(component):
     for i in range(num):
         if isinstance(component.species, systemspec.LinearPolymerSpec):
             coordlist.append(walk_linearPolymer(component.species))  
+        elif isinstance(component.species, systemspec.MonatomicMoleculeSpec):
+            coordlist.append(np.array([0,0,0])) # will be placed randomly in placecomponent, called by systemCoords
     
     # coordlist is a list of numpy arrays
     return coordlist
@@ -96,7 +105,7 @@ def placeComponent(coordlist, region, regioncenter=[0,0,0], COM=True):
     randcomlist = np.multiply(region, np.random.rand(len(comlist),3)-0.5) + np.array(regioncenter)
     newcoordlist = []
     for i,coord in enumerate(coordlist):
-        newcoord = coord - comlist[i] + randcomlist[i,:]
+        newcoord = (coord - comlist[i] + randcomlist[i,:]).reshape([-1,3]) # make sure correct dimensions even for single-atom molecules
         newcoordlist.append(newcoord)
 
     return newcoordlist
@@ -188,16 +197,16 @@ def build_snapshot(system, type='random', regions=[], regioncenters=[],verbose=F
     nBonds = len(bondgroup)
 
     # generate snapshot!!
-    snapshot = gsd.hoomd.Snapshot()
-    snapshot.configuration.box = box
-    snapshot.particles.N = N
-    snapshot.particles.position = pos
-    snapshot.particles.types = types
-    snapshot.particles.typeid = typeid
-    snapshot.bonds.N = nBonds
-    snapshot.bonds.types = bondtypes
-    snapshot.bonds.typeid = bondtypeid
-    snapshot.bonds.group = bondgroup
+    frame = gsd.hoomd.Frame()
+    frame.configuration.box = box
+    frame.particles.N = N
+    frame.particles.position = pos
+    frame.particles.types = types
+    frame.particles.typeid = typeid
+    frame.bonds.N = nBonds
+    frame.bonds.types = bondtypes
+    frame.bonds.typeid = bondtypeid
+    frame.bonds.group = bondgroup
 
     if verbose:
         print("Number of particles:             N = {:d}".format(N))
@@ -208,4 +217,4 @@ def build_snapshot(system, type='random', regions=[], regioncenters=[],verbose=F
         print("Number of bond types:            len(bondtypes) = {:d}".format(len(bondtypes)))
         print("Number of bond type ids:         len(bondtypeid) = {:d}".format(len(bondtypeid)))
         print("Number of bond groups:           len(bondgroup) = {:d}".format(len(bondgroup)))
-    return snapshot
+    return frame
