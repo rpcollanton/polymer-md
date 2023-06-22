@@ -151,6 +151,25 @@ def relax_overlaps_AB(initial_state, device, epsAB, iterations, fname=None):
     
     return sim.state
 
+def nvt_dpd(initial_state, device, aAB, kT, iterations, fstruct=None, ftraj=None):
+
+    # force field parameters
+    dpdParam = {('A','A'): dict(A=25.0, gamma=3.0),
+               ('B','B'): dict(A=25.0, gamma=3.0),
+               ('A','B'): dict(A=aAB, gamma=3.0)}
+    dpd_rcut = 2.0
+    bondParam = dict(k=30.0, r0=1.5, epsilon=0.0, sigma=1.0, delta=0.0)
+    feneParam = {'A-A': bondParam, 'B-B': bondParam}
+
+    # update period
+    period = 5000
+    
+    sim = setup_DPD_FENE(initial_state, device, iterations, period, dpdParam, dpd_rcut, feneParam, kT,
+                            fstruct=fstruct, ftraj=ftraj)
+
+    sim.run(iterations)
+    return sim.state
+
 def equilibrate(initial_state, device, kT, iterations, period=5000, fstruct=None, ftraj=None, flog=None):
 
     # force field parameters
@@ -367,6 +386,44 @@ def run_GAUSSIAN_FENE(initial_state, device, kT, prefactor_range, feneParam, ite
     sim.run(iterations-sim.timestep) # remaining iterations
 
     return sim.state
+
+def setup_DPD_FENE(initial_state, device, period, dpdParam, dpd_rcut, feneParam, kT, fstruct=None, ftraj=None):
+
+    sim = hoomd.Simulation(device=device, seed=1)
+    sim.create_state_from_snapshot(initial_state)
+
+    # FENE bonded interactions
+    fenewca = hoomd.md.bond.FENEWCA()
+    fenewca.params = feneParam
+
+    # LJ non-bonded interactions
+    nlist = hoomd.md.nlist.Cell(buffer=0.5) # buffer impacts performance, not correctness, with default other settings!
+    dpd = hoomd.md.pair.DPD(nlist, kT=kT, default_r_cut=dpd_rcut)
+    dpd.params = dpdParam
+    
+    # integrator
+    nve = hoomd.md.methods.NVE(filter=hoomd.filter.All())
+    integrator = hoomd.md.Integrator(dt=0.005, methods=nve, forces=[fenewca, dpd])
+    sim.operations.integrator = integrator
+
+    if ftraj!=None:
+        # write trajectory
+        add_write_trajectory(sim, period, ftraj)
+
+    if fstruct!=None:
+        # write final state
+        add_write_state(sim, iterations, fstruct)
+
+    # loggable computes
+    thermo = custom.Thermo(sim)
+
+    # add table logging
+    tablelogger = basic_logger(sim, thermo)
+    add_table_log(sim, period, tablelogger)
+    
+    sim.run(iterations)
+
+    return sim
 
 def setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=None, ftraj=None, flog=None):
     sim = hoomd.Simulation(device=device, seed=1)
