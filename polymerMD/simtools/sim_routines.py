@@ -164,7 +164,7 @@ def nvt_dpd(initial_state, device, aAB, kT, iterations, fstruct=None, ftraj=None
     # update period
     period = 5000
     
-    sim = setup_DPD_FENE(initial_state, device, iterations, period, dpdParam, dpd_rcut, feneParam, kT,
+    sim = setup_DPD_FENE(initial_state, device, period, dpdParam, dpd_rcut, feneParam, kT,
                             fstruct=fstruct, ftraj=ftraj)
 
     sim.run(iterations)
