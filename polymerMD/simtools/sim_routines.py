@@ -208,6 +208,26 @@ def equilibrate_AB(initial_state, device, epsAB, kT, iterations, period=5000, fs
     sim.run(iterations)
     return sim.state
 
+def equilibrate_npt(initial_state, device, kT, P, iterations, period=5000, fstruct=None, ftraj=None, flog=None):
+
+    # force field parameters
+    ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0)}
+    lj_rcut = 2**(1/6)
+    feneParam = {'A-A': dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)}
+
+    # npt thermostat and barostat method
+    dt = 0.005 # not setting it here, just copying from the setup_ljfene function! 
+    tau = 100*dt
+    tauS = 1000*dt
+    npt = hoomd.md.methods.NPT(filter=hoomd.filter.All(), kT = kT, tau=tau, tauS = tauS, S = P, couple='xyz')
+    methods = [npt]
+    
+    sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
+                            fstruct=fstruct, ftraj=ftraj, flog=flog)
+    
+    sim.run(iterations)
+    return sim.state
+
 def production(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, flog=None):
 
     # force field parameters
