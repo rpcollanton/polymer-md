@@ -1,6 +1,7 @@
 import gsd.hoomd
 import gsd.pygsd
 import numpy as np
+import freud
 from scipy import stats
 
 # utility functions
@@ -42,8 +43,6 @@ def shift_pbc(coords, box, shift):
     coords = wrap_coords(coords,box)
 
     return coords
-
-
 
 def binned_density_1D(coord, box, axis, nBins):
     # given a set of coordinates (and a box that those coordinates should all fall within, centered on origin),
@@ -99,6 +98,18 @@ def binned_density_ND(coord, box, N, nBins):
     totalbins = np.product(h[0].shape)
     binvol = box[0]*box[1]*box[2] / totalbins
     h = (h[0] / binvol, h[1])
+
+    return h
+
+def gaussian_density_ND(coord, box, N, nBins,sigma=2**(1/6)):
+
+    cutoff = np.amax(box)/3
+    gd = freud.density.GaussianDensity(nBins,cutoff,sigma)
+    gd.compute((coord,box))
+
+    boxrange = [(0-box[d]/2, 0+box[d]/2) for d in range(N)]
+    bins = [np.linspace(boxrange[d][0],boxrange[d][1],nBins+1) for d in range(N)]
+    h = (gd.density, bins)
 
     return h
 

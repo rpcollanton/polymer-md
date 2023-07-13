@@ -143,7 +143,7 @@ def internaldistances_species(f, system: systemspec.System):
 
     return speciesRsq
 
-def volfrac_fields(f, nBins=None):
+def volfrac_fields(f, nBins=None, density_type='binned'):
 
     if isinstance(f, gsd.hoomd.HOOMDTrajectory):
         ts = [f[i].configuration.step for i in range(len(f))]
@@ -166,14 +166,17 @@ def volfrac_fields(f, nBins=None):
     for i,type in enumerate(types):
         mask = particleTypeID==i
         coords = particleCoord[mask,:]
-        hists[type] = utility.binned_density_ND(coords, box, N=3, nBins=nBins)
+        if density_type=='binned':
+            hists[type] = utility.binned_density_ND(coords, box, N=3, nBins=nBins)
+        elif density_type=='gaussian':
+            hists[type] = utility.gaussian_density_ND(coords, box, N=3, nBins=nBins)
 
     # convert to "volume fractions"
     volfracs = utility.count_to_volfrac(hists)
 
     return volfracs
 
-def exchange_average(f, nBins=None):
+def exchange_average(f, nBins=None,density_type='binned'):
 
     if isinstance(f, gsd.hoomd.HOOMDTrajectory):
         ts = [f[i].configuration.step for i in range(len(f))]
@@ -181,7 +184,7 @@ def exchange_average(f, nBins=None):
         return ts, list(map(func, f))
 
     # f is a frame of a trajectory (a snapshot)
-    volfracs = volfrac_fields(f, nBins)
+    volfracs = volfrac_fields(f, nBins,density_type=density_type)
 
     # Specific to an A-B System! Exchange field, psi order parameter in Kremer/Grest 1996
     exchange = volfracs['A'][0] - volfracs['B'][0]
