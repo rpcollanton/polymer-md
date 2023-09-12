@@ -228,6 +228,10 @@ def equilibrate_npt(initial_state, device, kT, P, iterations, period=5000, fstru
     sim.run(iterations)
     return sim.state
 
+def equilibrate_npat():
+
+    return
+
 def production(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, flog=None):
 
     # force field parameters
@@ -258,6 +262,10 @@ def production(initial_state, device, epsAB, kT, iterations, period=None, fstruc
     sim.run(iterations)
 
     return sim.state
+
+def production_npat():
+
+    return
 
 def production_IK(initial_state, device, epsAB, kT, iterations, period=None, 
                   fstruct=None, ftraj=None, flog=None, fthermo=None, fedge=None, nbins=40, axis=0):
