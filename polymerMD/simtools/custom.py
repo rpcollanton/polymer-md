@@ -92,6 +92,13 @@ class Thermo(metaclass=hoomd.logging.Loggable):
             return self.thermocompute.pressure
         else:
             return 0
+
+    @log
+    def volume(self):
+        if self.sim.timestep > 0:
+            return self.thermocompute.volume
+        else:
+            return 0
     
     @log
     def kinetic_energy(self):

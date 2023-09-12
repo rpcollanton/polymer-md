@@ -22,10 +22,12 @@ def add_write_state(sim: hoomd.Simulation, iter: int, fname: str):
     sim.operations.writers.append(write_gsd)
     return
 
-def add_write_trajectory(sim: hoomd.Simulation, period: int, ftraj: str):
+def add_write_trajectory(sim: hoomd.Simulation, period: int, ftraj: str, filter=hoomd.filter.All(), dynamic=None):
 
     write_traj_gsd = hoomd.write.GSD(filename=ftraj,
                             trigger=hoomd.trigger.Periodic(period=period),
+                            filter=filter,
+                            dynamic=dynamic,
                             mode='wb')
     sim.operations.writers.append(write_traj_gsd)
 
@@ -266,41 +268,6 @@ def production(initial_state, device, epsAB, kT, iterations, period=None, fstruc
 def production_npat():
 
     return
-
-def production_IK(initial_state, device, epsAB, kT, iterations, period=None, 
-                  fstruct=None, ftraj=None, flog=None, fthermo=None, fedge=None, nbins=40, axis=0):
-
-    # force field parameters
-    ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
-               ('B','B'): dict(epsilon=1.0, sigma=1.0),
-               ('A','B'): dict(epsilon=epsAB, sigma=1.0)}
-    lj_rcut = 2**(1/6)
-    bondParam = dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)
-    feneParam = {}
-    for bondtype in initial_state.bonds.types:
-        feneParam[bondtype] = bondParam
-
-    # langevin thermostat and integrator
-    langevin = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT = kT)
-    methods = [langevin]
-
-    # thermo period
-    if period==None:
-        period = 5000
-    
-    sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
-                            fstruct=fstruct, ftraj=ftraj, flog=flog)
-    
-    # add momentum zeroer! approximately freeze system in place, no bulk motion allowed.
-    zeromomentum = hoomd.md.update.ZeroMomentum(hoomd.trigger.Periodic(50))
-    sim.operations.updaters.append(zeromomentum)
-
-    # add thermo IK compute
-    ik.add_thermo_ik(sim, period, axis, nbins, fthermo, fedge)
-    
-    sim.run(iterations)
-
-    return sim.state
 
 def run_filtered_thermo(initial_state, device, epsAB, kT, iterations, period=None, 
                         fstruct=None, ftraj=None, fthermo=None, fedge=None, nBins = 40, axis=0):
