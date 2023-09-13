@@ -230,9 +230,30 @@ def equilibrate_npt(initial_state, device, kT, P, iterations, period=5000, fstru
     sim.run(iterations)
     return sim.state
 
-def equilibrate_npat():
+def simulate_npat(initial_state, device, epsAB, Px, kT, iterations, period=5000, fstruct=None, ftraj=None, flog=None):
 
-    return
+    # force field parameters
+    ljParam = {('A','A'): dict(epsilon=1.0, sigma=1.0),
+               ('B','B'): dict(epsilon=1.0, sigma=1.0),
+               ('A','B'): dict(epsilon=epsAB, sigma=1.0)}
+    lj_rcut = 2**(1/6)
+    bondParam = dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)
+    feneParam = {}
+    for bondtype in initial_state.bonds.types:
+        feneParam[bondtype] = bondParam
+
+    # npxt thermostat and barostat method
+    dt = 0.005 # not setting it here, just copying from the setup_ljfene function! 
+    tau = 100*dt
+    tauS = 1000*dt
+    npxt = hoomd.md.methods.NPT(filter=hoomd.filter.All(), kT = kT, tau=tau, tauS = tauS, S = Px, box_dof=[True,False,False,False,False,False], couple='none')
+    methods = [npxt]
+    
+    sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
+                            fstruct=fstruct, ftraj=ftraj, flog=flog)
+    
+    sim.run(iterations)
+    return sim.state
 
 def production(initial_state, device, epsAB, kT, iterations, period=None, fstruct=None, ftraj=None, flog=None):
 
@@ -264,10 +285,6 @@ def production(initial_state, device, epsAB, kT, iterations, period=None, fstruc
     sim.run(iterations)
 
     return sim.state
-
-def production_npat():
-
-    return
 
 def run_filtered_thermo(initial_state, device, epsAB, kT, iterations, period=None, 
                         fstruct=None, ftraj=None, fthermo=None, fedge=None, nBins = 40, axis=0):
