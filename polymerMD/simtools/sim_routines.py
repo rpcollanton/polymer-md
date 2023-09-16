@@ -104,7 +104,7 @@ def remove_overlaps(initial_state, device, kT, prefactor_range, iterations, fnam
 
     return snap
 
-def relax_overlaps(initial_state, device, iterations, fname=None):
+def relax_overlaps(initial_state, device, iterations, displacement = None, fname=None):
 
     # overlap will still be significant given the 1/r dependence of the LJ potential
 
@@ -114,12 +114,14 @@ def relax_overlaps(initial_state, device, iterations, fname=None):
     feneParam = {'A-A': dict(k=30.0, r0=1.5, epsilon=1.0, sigma=1.0, delta=0.0)}
 
     # newtonian NVE dynamics with limit on displacement
-    displ = hoomd.variant.Ramp(0.001,0.005,0,iterations)
-    nveCapped = hoomd.md.methods.DisplacementCapped(filter=hoomd.filter.All(), maximum_displacement=displ)
+    if displacement == None:
+        displacement = [0.001, 0.005]
+    displacementramp = hoomd.variant.Ramp(displacement[0],displacement[1],0,iterations)
+    nveCapped = hoomd.md.methods.DisplacementCapped(filter=hoomd.filter.All(), maximum_displacement=displacementramp)
     methods = [nveCapped]
 
     # update period
-    period = 5000
+    period = 2500
     
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, fstruct=fname)
     sim.run(iterations)
@@ -367,7 +369,7 @@ def run_GAUSSIAN_FENE(initial_state, device, kT, prefactor_range, feneParam, ite
     # gaussian pair potential, similar to KG soft potential when pre-factor multiplied by 2
     # and length scale multiplied by 2/5
     nlist = hoomd.md.nlist.Cell(buffer=0.5) # buffer impacts performance, not correctness, with default other settings!
-    gaussian = hoomd.md.pair.Gauss(nlist, default_r_cut=2.5)
+    gaussian = hoomd.md.pair.Gaussian(nlist, default_r_cut=2.5)
 
     # custom ramping of energetic prefactor because parameters don't accept hoomd.variant type
     rampsteps = 100
@@ -441,17 +443,22 @@ def setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, f
     sim = hoomd.Simulation(device=device, seed=1)
     sim.create_state_from_snapshot(initial_state)
 
-    # FENE bonded interactions
-    fenewca = hoomd.md.bond.FENEWCA()
-    fenewca.params = feneParam
+
 
     # LJ non-bonded interactions
     nlist = hoomd.md.nlist.Cell(buffer=0.5) # buffer impacts performance, not correctness, with default other settings!
     lj = hoomd.md.pair.LJ(nlist, default_r_cut=lj_rcut)
     lj.params = ljParam
+    forces = [lj]
+
+    # FENE bonded interactions
+    if feneParam != None: 
+        fenewca = hoomd.md.bond.FENEWCA()
+        fenewca.params = feneParam
+        forces.append(fenewca)
     
     # integrator
-    integrator = hoomd.md.Integrator(dt=0.005, methods=methods, forces=[fenewca, lj])
+    integrator = hoomd.md.Integrator(dt=0.005, methods=methods, forces=forces)
     sim.operations.integrator = integrator
 
     # loggable computes
