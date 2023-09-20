@@ -84,7 +84,7 @@ def add_filtered_thermo(sim: hoomd.Simulation, period: int, axis: int, nbins: in
 
     # create spatial thermo gsd log file
     log_writer = hoomd.write.GSD(filename=flog, trigger=trigger, mode='wb', filter=hoomd.filter.Null())
-    log_writer.log = logger
+    log_writer.logger = logger
     sim.operations.writers.append(log_writer)
 
     # write edges to a file!
@@ -481,7 +481,7 @@ def setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, f
         trajlog.add(sim, ['timestep'])
         trigger = hoomd.trigger.Periodic(period)
         log_writer = hoomd.write.GSD(filename=flog, trigger=trigger, mode='wb', filter=hoomd.filter.Null())
-        log_writer.log = trajlog
+        log_writer.logger = trajlog
         sim.operations.writers.append(log_writer)
 
     # add table logging
