@@ -128,7 +128,7 @@ def relax_overlaps(initial_state, device, iterations, displacement = None, fname
     
     return sim.state
 
-def relax_overlaps_AB(initial_state, device, epsAB, iterations, fname=None):
+def relax_overlaps_AB(initial_state, device, epsAB, iterations, displacement=None, fname=None):
 
     # overlap will still be significant given the 1/r dependence of the LJ potential
 
@@ -143,8 +143,10 @@ def relax_overlaps_AB(initial_state, device, epsAB, iterations, fname=None):
         feneParam[bondtype] = bondParam
 
     # newtonian NVE dynamics with limit on displacement
-    displ = hoomd.variant.Ramp(0.001,0.005,0,iterations)
-    nveCapped = hoomd.md.methods.DisplacementCapped(filter=hoomd.filter.All(), maximum_displacement=displ)
+    if displacement == None:
+        displacement = [0.001, 0.005]
+    displacementramp = hoomd.variant.Ramp(displacement[0],displacement[1],0,iterations)
+    nveCapped = hoomd.md.methods.DisplacementCapped(filter=hoomd.filter.All(), maximum_displacement=displacementramp)
     methods = [nveCapped]
 
     # update period
@@ -248,7 +250,8 @@ def simulate_npat(initial_state, device, epsAB, Px, kT, iterations, period=5000,
     dt = 0.005 # not setting it here, just copying from the setup_ljfene function! 
     tau = 100*dt
     tauS = 1000*dt
-    npxt = hoomd.md.methods.NPT(filter=hoomd.filter.All(), kT = kT, tau=tau, tauS = tauS, S = Px, box_dof=[True,False,False,False,False,False], couple='none')
+    thermostat = hoomd.md.methods.thermostats.MTTK(kT=kT,tau=tau)
+    npxt = hoomd.md.methods.ConstantPressure(filter=hoomd.filter.All(), thermostat=thermostat, tauS=tauS, S=Px, box_dof=[True,False,False,False,False,False], couple='none')
     methods = [npxt]
     
     sim = setup_LJ_FENE(initial_state, device, iterations, period, ljParam, lj_rcut, feneParam, methods, 
