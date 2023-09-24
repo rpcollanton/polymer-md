@@ -328,7 +328,9 @@ class System:
         indices = []
         idx_current = 0
         for component in self.components:
-            specieslength = component.species.length
+            if not component.species.isPolymer: # assuming only polymers have blocks! 
+                idx_start += component.numparticles
+                continue
             for i in range(component.N):
                 molindices = []
                 for block in component.species.blocks:

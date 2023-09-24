@@ -143,6 +143,62 @@ def internaldistances_species(f, system: systemspec.System):
 
     return speciesRsq
 
+def lineardistancesfromjunctions(f, system: systemspec.System):
+
+    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+        ts = [f[i].configuration.step for i in range(len(f))]
+        func = lambda t: lineardistancesfromjunctions(t, system)
+        return ts, list(map(func, f))
+    
+    # get box information
+    box = freud.box.Box.from_box(f.configuration.box)
+
+    # get block particle indices and junctions for each copolymer
+    particleindices = [mol for mol in system.indicesByBlockByMolecule() if len(mol) > 1]
+    junctionindices = [mol for mol in system.junctionsByMolecule() if len(mol) > 0]
+    # structure is [ [[],[]], [[],[]], ... ] where outer is whole system, 2nd level is molecules, 3rd level is blocks
+    # so.... particle[0][1][2] gets the index of the third particle in the second block in the first molecule
+    # and... junction[0][1] gets the list [a,b] for the second junction of the first molecule, 
+    # where a is the first atom in the bond and b is the second
+    
+    # compute junction coordinates and store in same organization
+    junctioncoordinates = []
+    for moljunctionindices in junctionindices:
+        moljunctioncoordinates = []
+        for junction in moljunctionindices:
+            jxncoord = 1/2*np.sum(f.particles.position[junction,:],axis=0)
+            moljunctioncoordinates.append(jxncoord)
+        junctioncoordinates.append(moljunctioncoordinates)
+
+    # split into endbloocks and midblocks
+    endblocks = []
+    endblockjunctions = []
+    midblocks = []
+    midblockjunctions = []
+    for molparticleindices, moljunctioncoordinates in zip(particleindices,junctioncoordinates):
+        endblocks.append(molparticleindices[0])
+        endblocks.append(molparticleindices[-1][::-1]) # [::-1] reverses the order of the list by taking every "-1th" element of list
+        endblockjunctions.append(moljunctioncoordinates[0])
+        endblockjunctions.append(moljunctioncoordinates[-1])
+
+        # check if this is longer than a diblock (ie if there are midblocks)
+        if len(molparticleindices) > 2: # if more than 2 blocks
+            # for midblocks, split down the middle associate with correct junction
+            for i, midblock in enumerate(molparticleindices[1:-1]):
+                blocklength = len(midblock)
+                # first half of block
+                midblocks.append(midblock[0:int(blocklength/2)])
+                midblockjunctions.append(moljunctioncoordinates[i,:])
+                # other half of block
+                midblocks.append(midblock[int(blocklength/2):][::-1])
+                midblockjunctions.append(moljunctioncoordinates[i+1,:])
+
+    # get Rsq vs n for endblocks and midblocks where n is distance from junction
+    endblockAvgRsq, endblockN = structure.meanSqDistanceFromJunction(f.particles.position, endblocks, endblockjunctions, box)
+    midblockAvgRsq, midblockN = structure.meanSqDistanceFromJunction(f.particles.position, midblocks, midblockjunctions, box)
+
+    return (endblockAvgRsq, endblockN), (midblockAvgRsq, midblockN)
+
 def volfrac_fields(f, nBins=None, density_type='binned'):
 
     if isinstance(f, gsd.hoomd.HOOMDTrajectory):
@@ -304,8 +360,6 @@ def junction_density_smeared(f, system: systemspec.System, axis, nBins=500, sigm
     gd_right.compute(aq_right)
 
     return gd_left, gd_right
-
-    
 
 def interfacial_tension_IK(dat, edges, axis):
 
