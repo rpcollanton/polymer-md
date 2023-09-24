@@ -102,33 +102,28 @@ def meanSqDistanceFromJunction(coord, blocks, junctions, box):
     This is because results will be averaged together and returned in a single array
 
     '''
-
     # find block length and initialize arrays
     blockSize = len(blocks[0])
     for block in blocks:
         if len(block) != blockSize:
             raise ValueError("Inputted blocks are not the same length and thus probably shouldn't be treated as identical.")
-
     coordWithJunction = coord
     points1 = []
     points2 = []
     segmentlength = []
     for idx_block,block in enumerate(blocks):
-        coordWithJunction = np.append(coordWithJunction, junctions[idx_block,:],axis=0)
+        coordWithJunction = np.append(coordWithJunction, junctions[[idx_block],:],axis=0) # can do this cleaner for sure
         idx_junction = coordWithJunction.shape[0]-1 #index of last coordinate, which is the junction that was just appended
         
         # loop over coordinates in the block
-        minidx = min(block)
-        maxidx = max(block)
-        idxrange = list(range(minidx,maxidx+1))
-        for idx_segment in idxrange:
+        idx_next_to_junction = block[0]
+        for idx_segment in block:
             points1.append(idx_junction)
             points2.append(idx_segment)
-            segmentlength.append(idx_segment-minidx + 0.5) # corrected with +0.5 because junction is 0.5 away from last block
+            segmentlength.append(abs(idx_segment-idx_next_to_junction) + 0.5) # corrected with +0.5 because junction is 0.5 away from last block
 
-        
     # use box object to compute distances
-    distances = box.compute_distances(coord[points1], coord[points2])        
+    distances = box.compute_distances(coordWithJunction[points1], coordWithJunction[points2])        
 
     # sum up the squared segment distances
     distancesSquared = np.square(distances)
