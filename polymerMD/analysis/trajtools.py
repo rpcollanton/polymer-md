@@ -166,7 +166,9 @@ def lineardistancesfromjunctions(f, system: systemspec.System):
     for moljunctionindices in junctionindices:
         moljunctioncoordinates = []
         for junction in moljunctionindices:
-            jxncoord = 1/2*np.sum(f.particles.position[junction,:],axis=0)
+            coord0 = f.particles.position[[junction[0]],:]
+            coord1 = f.particles.position[[junction[1]],:]
+            jxncoord = utility.get_midpoint(coord0,coord1,box.L).reshape(-1)
             moljunctioncoordinates.append(jxncoord)
         junctioncoordinates.append(np.array(moljunctioncoordinates))
 
@@ -196,6 +198,13 @@ def lineardistancesfromjunctions(f, system: systemspec.System):
 
     endblockjunctions = np.array(endblockjunctions)
     midblockjunctions = np.array(midblockjunctions)
+
+    #print("endblock indices")
+    #print(endblocks[9])
+    #print("diff between coordinate 0 and junction coordinate ")
+    #for i,block in enumerate(endblocks):
+    #    print(f.particles.position[block[0],:]-endblockjunctions[i,:])
+
 
     # get Rsq vs n for endblocks and midblocks where n is distance from junction
     blockdata = {}

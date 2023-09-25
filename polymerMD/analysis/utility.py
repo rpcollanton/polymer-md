@@ -35,6 +35,13 @@ def wrap_coords(coords,boxsize):
 
     return wrapped 
 
+def get_midpoint(coord0,coord1,box):
+    
+    diff = wrap_coords(coord1-coord0,box)
+    midpt = wrap_coords(coord0 + diff/2,box)
+
+    return midpt
+
 def shift_pbc(coords, box, shift):
     # dimensions need to match
     # coords N x d, box 1 x d, shift 1 x d
