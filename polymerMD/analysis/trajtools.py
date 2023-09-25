@@ -198,7 +198,10 @@ def lineardistancesfromjunctions(f, system: systemspec.System):
     endblockAvgRsq, endblockN = structure.meanSqDistanceFromJunction(f.particles.position, endblocks, endblockjunctions, box)
     midblockAvgRsq, midblockN = structure.meanSqDistanceFromJunction(f.particles.position, midblocks, midblockjunctions, box)
 
-    return (endblockAvgRsq, endblockN), (midblockAvgRsq, midblockN)
+    blockdata = {}
+    blockdata['endblocks'] = (endblockAvgRsq, endblockN)
+    blockdata['midblocks'] = (midblockN, midblockAvgRsq)
+    return blockdata
 
 def volfrac_fields(f, nBins=None, density_type='binned'):
 
