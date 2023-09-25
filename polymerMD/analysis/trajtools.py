@@ -168,7 +168,7 @@ def lineardistancesfromjunctions(f, system: systemspec.System):
         for junction in moljunctionindices:
             jxncoord = 1/2*np.sum(f.particles.position[junction,:],axis=0)
             moljunctioncoordinates.append(jxncoord)
-        junctioncoordinates.append(moljunctioncoordinates)
+        junctioncoordinates.append(np.array(moljunctioncoordinates))
 
     # split into endbloocks and midblocks
     endblocks = []
@@ -179,8 +179,8 @@ def lineardistancesfromjunctions(f, system: systemspec.System):
         # order indices by nearest junction to furthest from junction
         endblocks.append(molparticleindices[0][::-1]) # [::-1] reverses the order of the list by taking every "-1th" element of list
         endblocks.append(molparticleindices[-1]) 
-        endblockjunctions.append(moljunctioncoordinates[0])
-        endblockjunctions.append(moljunctioncoordinates[-1])
+        endblockjunctions.append(moljunctioncoordinates[0,:])
+        endblockjunctions.append(moljunctioncoordinates[-1,:])
 
         # check if this is longer than a diblock (ie if there are midblocks)
         if len(molparticleindices) > 2: # if more than 2 blocks
@@ -194,13 +194,18 @@ def lineardistancesfromjunctions(f, system: systemspec.System):
                 midblocks.append(midblock[int(blocklength/2):][::-1])
                 midblockjunctions.append(moljunctioncoordinates[i+1,:])
 
-    # get Rsq vs n for endblocks and midblocks where n is distance from junction
-    endblockAvgRsq, endblockN = structure.meanSqDistanceFromJunction(f.particles.position, endblocks, endblockjunctions, box)
-    midblockAvgRsq, midblockN = structure.meanSqDistanceFromJunction(f.particles.position, midblocks, midblockjunctions, box)
+    endblockjunctions = np.array(endblockjunctions)
+    midblockjunctions = np.array(midblockjunctions)
 
+    # get Rsq vs n for endblocks and midblocks where n is distance from junction
     blockdata = {}
-    blockdata['endblocks'] = (endblockAvgRsq, endblockN)
-    blockdata['midblocks'] = (midblockN, midblockAvgRsq)
+    endblockAvgRsq, endblockN = structure.meanSqDistanceFromJunction(f.particles.position, endblocks, endblockjunctions, box)
+    blockdata['endblocks'] = (endblockN, endblockAvgRsq)
+    
+    if len(midblocks) > 0:
+        midblockAvgRsq, midblockN = structure.meanSqDistanceFromJunction(f.particles.position, midblocks, midblockjunctions, box)
+        blockdata['midblocks'] = (midblockN, midblockAvgRsq)
+    
     return blockdata
 
 def volfrac_fields(f, nBins=None, density_type='binned'):
