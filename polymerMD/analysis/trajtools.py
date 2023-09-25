@@ -176,8 +176,9 @@ def lineardistancesfromjunctions(f, system: systemspec.System):
     midblocks = []
     midblockjunctions = []
     for molparticleindices, moljunctioncoordinates in zip(particleindices,junctioncoordinates):
-        endblocks.append(molparticleindices[0])
-        endblocks.append(molparticleindices[-1][::-1]) # [::-1] reverses the order of the list by taking every "-1th" element of list
+        # order indices by nearest junction to furthest from junction
+        endblocks.append(molparticleindices[0][::-1]) # [::-1] reverses the order of the list by taking every "-1th" element of list
+        endblocks.append(molparticleindices[-1]) 
         endblockjunctions.append(moljunctioncoordinates[0])
         endblockjunctions.append(moljunctioncoordinates[-1])
 
