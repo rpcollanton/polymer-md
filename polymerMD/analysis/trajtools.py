@@ -410,7 +410,7 @@ def interfacial_tension_IK(dat, edges, axis):
 
     return gamma
 
-def interfacial_tension_global(dat, axis, L):
+def interfacial_tension_global(dat, axis, L=None):
 
     # dat is a hoomdtrajectory or frame containing log data
     # axis is the axis normal to the interface(s)
@@ -425,6 +425,9 @@ def interfacial_tension_global(dat, axis, L):
     pT_indices = [0, 3, 5]
     pN_idx = pT_indices.pop(axis)
     pdiff = p_tensor[pN_idx] - 1/2 * np.sum(p_tensor[pT_indices])
+    # get L from current frame if L = none. Useful if L can change
+    if L==None:
+        L = dat.configuration.box[axis]
     gamma = L * pdiff / 2 # Assume there are two interfaces
 
     return gamma
