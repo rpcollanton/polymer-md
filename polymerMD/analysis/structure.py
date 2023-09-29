@@ -1,5 +1,6 @@
 import freud
 import numpy as np
+from polymerMD.analysis.utility import wrap_coords
 
 def getAllPairs(maxIdx, minIdx=0):
 
@@ -17,7 +18,6 @@ def meanEndToEnd(coord, molecules, box, power=2):
         box (freud.box.Box):            box used to compute distances
         power (float or int):           power to raise distances to inside average         
     Returns:
-        n (np.ndarray):         1 x max(molecule lengths)-1 containing the corresponding segment lengths
         avgDistToPower (float): average of end to end distances to inputted power
     '''
 
@@ -34,9 +34,48 @@ def meanEndToEnd(coord, molecules, box, power=2):
 
     # average the distances
     distToPower = np.power(distances,power)
-    avgDistToPower = np.mean(distToPower,axis)
+    avgDistToPower = np.mean(distToPower,axis=0)
 
-    return avgDistToPower
+    return avgDistToPower, distances
+
+def meanRadiusGyration(coord, molecules, box, power=2):
+    '''
+    Args:
+        coord (np.ndarray):             Nx3 array for the coordinates of N particles
+        molecules (List[List[int]]):    list of indices of particles in each molecule
+        box (freud.box.Box):            box used to compute distances
+        power (float or int):           power to raise distances to inside average         
+    Returns:
+        avgRgToPower (float): average of end to end distances to inputted power
+    '''
+
+    # loop over molecules and identify indices of distances to compute
+    # this way we only make one call to compute distances.. much faster!
+    points1 = []
+    points2 = []
+    pos = coord
+    for mol in molecules:
+        # unwrap coordinates in molecule to be continuous based on first particle
+        r0 = pos[mol[0],:]
+        pos[mol,:] = r0 + wrap_coords(pos[mol,:] - r0, box.L)
+        for i in mol:
+            points1.append(i)
+            points2.append(pos.shape[0]) # the eventual location of the com
+        com = np.mean(pos[mol,:],axis=0).reshape(1,-1)
+        pos = np.append(pos,com,axis=0)
+        
+    # use box object to compute distances from com
+    distances = box.compute_distances(pos[points1], pos[points2])
+
+    # square and average the distances
+    distancesSquared = np.square(distances)
+    RgSquared = np.array([np.mean(
+        distancesSquared[[points1.index(i) for i in mol]], axis=0
+    ) for mol in molecules])
+    avgRgToPower = np.mean(np.power(RgSquared,power/2),axis=0) # already raised to 2nd power
+
+    return avgRgToPower, RgSquared
+
 
 def meanSqInternalDist(coord, molecules, box):
     '''
