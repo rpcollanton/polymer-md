@@ -36,7 +36,7 @@ def meanEndToEnd(coord, molecules, box, power=2):
     distToPower = np.power(distances,power)
     avgDistToPower = np.mean(distToPower,axis=0)
 
-    return avgDistToPower, distances
+    return avgDistToPower, distToPower
 
 def meanRadiusGyration(coord, molecules, box, power=2):
     '''
@@ -72,9 +72,10 @@ def meanRadiusGyration(coord, molecules, box, power=2):
     RgSquared = np.array([np.mean(
         distancesSquared[[points1.index(i) for i in mol]], axis=0
     ) for mol in molecules])
-    avgRgToPower = np.mean(np.power(RgSquared,power/2),axis=0) # already raised to 2nd power
+    RgToPower = np.power(RgSquared,power/2)
+    avgRgToPower = np.mean(RgToPower,axis=0) # already raised to 2nd power
 
-    return avgRgToPower, RgSquared
+    return avgRgToPower, RgToPower
 
 
 def meanSqInternalDist(coord, molecules, box):
