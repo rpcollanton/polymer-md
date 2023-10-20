@@ -127,6 +127,47 @@ class LinearPolymerSpec(Species):
                 bondtypes.append('{:s}-{:s}'.format(labels[minID], labels[maxID]))
 
         return bondtypes
+    
+    @property 
+    def angles(self):
+        # this is specific to a linear polymer
+        # all the angles, indexing the first particle at 0 
+        angles = []
+        Ntot = 0
+        for idxblock,block in enumerate(self.blocks):
+            # within the block
+            for i in range(2,block.length):
+                angles.append([Ntot + (i-2), Ntot + (i-1), Ntot + i])
+            # connect the blocks. assumes next block is less than 1 long
+            if idxblock < (self.nBlocks-1):
+                angles.append([Ntot + block.length-2, Ntot + block.length-1, Ntot + block.length])
+                angles.append([Ntot + block.length-1, Ntot + block.length, Ntot + block.length+1])
+            # chain length so far
+            Ntot += block.length
+        
+        return angles
+    
+    @property 
+    def angletypes(self):
+        # this is specific to a linear polymer
+        # all the angle types
+        angletypes = []
+        Ntot = 0
+        for idxblock,block in enumerate(self.blocks):
+            # within the block
+            for i in range(2,block.length):
+                angletypes.append('{:s}-{:s}-{:s}'.format(block.monomer.label, block.monomer.label, block.monomer.label))
+            # connect the blocks. assumes next block is less than 1 long
+            if idxblock < (self.nBlocks-1):
+                uniqueids = [block.monomer.uniqueid, self.blocks[idxblock+1].monomer.uniqueid]
+                labels = [block.monomer.label, self.blocks[idxblock+1].monomer.label]
+                minID = np.argmin(uniqueids)
+                maxID = np.argmax(uniqueids)
+                angletypes.append('{:s}-{:s}-{:s}'.format(labels[minID], labels[minID], labels[maxID]))
+                angletypes.append('{:s}-{:s}-{:s}'.format(labels[minID], labels[maxID], labels[maxID]))
+        
+        return angletypes 
+
 
     @property
     def particletypes(self):
@@ -407,6 +448,22 @@ class System:
             junctions.append(moljunctions)        
         return junctions
     
+    def angles(self):
+
+        angles = []
+        angletypes = []
+        idx_start = 0
+        for component in self.components:
+            if not component.species.isPolymer:
+                idx_start += component.numparticles
+                continue
+            for i in range(component.N):
+                angles += ( np.array(component.species.angles) + idx_start ).tolist()
+                angletypes += component.species.angletypes
+                idx_start += component.species.length
+        
+        return angles, angletypes
+
 # Workflow:
 # Make a system
 # Set the box size

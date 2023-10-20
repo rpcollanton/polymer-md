@@ -171,6 +171,13 @@ def getBondTypes(system):
 
     return bonds, bondtypes, bondtypeid
 
+def getAngleTypes(system):
+    angles, allangletypes = system.angles()
+    angletypes = list(set(allangletypes))
+    angletypeid = [angletypes.index(bondlabel) for bondlabel in allangletypes]
+
+    return angles, angletypes, angletypeid
+
 def build_snapshot(system, type='random', regions=[], regioncenters=[],verbose=False):
 
     # get system box size, total number of particles, 
@@ -196,6 +203,10 @@ def build_snapshot(system, type='random', regions=[], regioncenters=[],verbose=F
     bondgroup, bondtypes, bondtypeid = getBondTypes(system)
     nBonds = len(bondgroup)
 
+    # get angle indices, types, and type ids
+    anglegroup, angletypes, angletypeid = getAngleTypes(system)
+    nAngles = len(anglegroup)
+
     # generate snapshot!!
     frame = gsd.hoomd.Frame()
     frame.configuration.box = box
@@ -207,6 +218,10 @@ def build_snapshot(system, type='random', regions=[], regioncenters=[],verbose=F
     frame.bonds.types = bondtypes
     frame.bonds.typeid = bondtypeid
     frame.bonds.group = bondgroup
+    frame.angles.N = nAngles
+    frame.angles.types = angletypes
+    frame.angles.typeid = angletypeid
+    frame.angles.group = anglegroup
 
     if verbose:
         print("Number of particles:             N = {:d}".format(N))
@@ -217,4 +232,8 @@ def build_snapshot(system, type='random', regions=[], regioncenters=[],verbose=F
         print("Number of bond types:            len(bondtypes) = {:d}".format(len(bondtypes)))
         print("Number of bond type ids:         len(bondtypeid) = {:d}".format(len(bondtypeid)))
         print("Number of bond groups:           len(bondgroup) = {:d}".format(len(bondgroup)))
+        print("Number of angles:                nAngles = {:d}".format(nAngles))
+        print("Number of angle types:           len(angletypes) = {:d}".format(len(angletypes)))
+        print("Number of angle type ids:        len(angletypeid) = {:d}".format(len(angletypeid)))
+        print("Number of angle groups:          len(anglegroup) = {:d}".format(len(anglegroup)))
     return frame
