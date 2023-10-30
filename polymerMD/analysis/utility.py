@@ -65,7 +65,7 @@ def binned_density_1D(coord, box, axis, nBins):
 
     return h
 
-def smoothed_density_1D(coord, box, axis, nBins):
+def smoothed_density_1D(coord, box, axis, nBins, width=None):
     # given a set of coordinates (and a box that those coordinates should all fall within, centered on origin),
     # compute the gaussian smoothed density along the specified axis!
 
@@ -74,7 +74,9 @@ def smoothed_density_1D(coord, box, axis, nBins):
 
     locs = coord[:,axis]
     nparticles = np.shape(locs)[0]
-    scale = (lmax-lmin)/75 # might need to adjust 
+    if width==None:
+        width = (lmin-lmax)/75
+    scale = width # might need to adjust 
     dists = [stats.norm(loc = loc, scale = scale) for loc in locs]
 
     nedges = nBins+1

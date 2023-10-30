@@ -43,7 +43,7 @@ def density_1D_monomers(f, nBins=100, axis=0, method='smoothed'):
 
     if isinstance(f, gsd.hoomd.HOOMDTrajectory):
         ts = [f[i].configuration.step for i in range(len(f))]
-        func = lambda t: density_1D_monomers(t, nBins=nBins, axis=axis)
+        func = lambda t: density_1D_monomers(t, nBins=nBins, axis=axis, method=method)
         return ts, list(map(func, f))
 
     box = f.configuration.box[0:3]
@@ -73,7 +73,7 @@ def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='
 
     if isinstance(f, gsd.hoomd.HOOMDTrajectory):
         ts = [f[i].configuration.step for i in range(len(f))]
-        func = lambda t: density_1D_species(t, system, nBins=nBins, axis=axis)
+        func = lambda t: density_1D_species(t, system, nBins=nBins, axis=axis, method=method)
         return ts, list(map(func, f))
 
     # get geometric information
@@ -97,6 +97,28 @@ def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='
     hists = utility.count_to_volfrac(hists)
     
     return hists
+
+def density_1D_lowest(f, nBins = 100, nLowest=10, axis=0, method='smoothed'):
+
+    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+        ts = [f[i].configuration.step for i in range(len(f))]
+        func = lambda t: density_1D_lowest(t, nBins=nBins, nLowest=nLowest, axis=axis)
+        return ts, list(map(func, f))
+
+    # get density
+    if method=='binned':
+        profile = utility.binned_density_1D(f.particles.position, 
+                                            f.configuration.box, 
+                                            axis=axis, nBins=nBins)
+    elif method=='smoothed':
+        profile = utility.smoothed_density_1D(f.particles.position, 
+                                            f.configuration.box, 
+                                            axis=axis, nBins=nBins, width=1)
+        
+    # find lowest slices
+    lowestdensities = sorted(profile[0].tolist())[0:nLowest]
+
+    return lowestdensities
 
 def internaldistances_all(f):
 
