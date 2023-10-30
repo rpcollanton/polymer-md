@@ -102,7 +102,7 @@ def density_1D_lowest(f, nBins = 100, nLowest=10, axis=0, method='smoothed'):
 
     if isinstance(f, gsd.hoomd.HOOMDTrajectory):
         ts = [f[i].configuration.step for i in range(len(f))]
-        func = lambda t: density_1D_lowest(t, nBins=nBins, nLowest=nLowest, axis=axis)
+        func = lambda t: density_1D_lowest(t, nBins=nBins, nLowest=nLowest, axis=axis, method=method)
         return ts, list(map(func, f))
 
     # get density
