@@ -315,6 +315,21 @@ class System:
             N += component.numparticles
         return N
     
+    @property
+    def nummolecules(self):
+        N = 0
+        for component in self.components:
+            N += component.N
+        return N
+
+    @property
+    def numpolymers(self):
+        N = 0
+        for component in self.components:
+            if component.species.isPolymer:
+                N += component.N
+        return N
+    
     # removed particleType(). will probably never be used and is too dependent on the type of species of the component!
 
     def particleTypes(self):
