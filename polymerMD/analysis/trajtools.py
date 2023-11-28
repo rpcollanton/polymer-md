@@ -239,6 +239,27 @@ def lineardistancesfromjunctions(f, system: systemspec.System):
     
     return blockdata
 
+def endToEndVectors(f, system: systemspec.System):
+
+    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+        ts = [f[i].configuration.step for i in range(len(f))]
+        func = lambda t: endToEndVectors(t)
+        return ts, list(map(func, f))
+    
+    # get box information
+    box = freud.box.Box.from_box(f.configuration.box)
+
+    # get chain ends
+    chainidxs = system.indicesByMolecule()
+    chainends = [[chain[0],chain[-1]] for chain in chainidxs]
+
+    # calculate vectors
+    vecs = np.array(
+        [box.wrap(f.particles.position[end[1],:]-f.particles.position[end[0]]) for end in chainends]
+    )
+    
+    return vecs
+
 def volfrac_fields(f, nBins=None, density_type='binned'):
 
     if isinstance(f, gsd.hoomd.HOOMDTrajectory):
