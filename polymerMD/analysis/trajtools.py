@@ -243,7 +243,7 @@ def endToEndVectors(f, system: systemspec.System):
 
     if isinstance(f, gsd.hoomd.HOOMDTrajectory):
         ts = [f[i].configuration.step for i in range(len(f))]
-        func = lambda t: endToEndVectors(t)
+        func = lambda t: endToEndVectors(t, system=system)
         return ts, list(map(func, f))
     
     # get box information
