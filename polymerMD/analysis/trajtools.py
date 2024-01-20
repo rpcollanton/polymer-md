@@ -37,13 +37,12 @@ def density_system(f):
 
     return N/V
 
-def density_1D_monomers(f, nBins=100, axis=0, method='smoothed'):
+def density_1D_monomers(f, nBins=100, axis=0, method='smoothed',to_volfrac=True):
     # f is a trajectory or trajectory frame
     # axis is the axis to plot the density along. averaged over other two
-
-    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+    if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
-        func = lambda t: density_1D_monomers(t, nBins=nBins, axis=axis, method=method)
+        func = lambda t: density_1D_monomers(t, nBins=nBins, axis=axis, to_volfrac=to_volfrac)
         return ts, list(map(func, f))
 
     box = f.configuration.box[0:3]
@@ -52,26 +51,27 @@ def density_1D_monomers(f, nBins=100, axis=0, method='smoothed'):
     types = f.particles.types
 
     hists = {}
-    for i,type in enumerate(types):
+    for i,typ in enumerate(types):
         mask = particleTypeID==i
         coords = particleCoord[mask,:]
         if method=='smoothed':
-            hists[type] = utility.smoothed_density_1D(coords, box, axis, nBins)
+            hists[typ] = utility.smoothed_density_1D(coords, box, axis, nBins)
         elif method=='binned':
-            hists[type] = utility.binned_density_1D(coords, box, axis, nBins)
+            hists[typ] = utility.binned_density_1D(coords, box, axis, nBins)
 
     # modify histograms so that sum over species in each bin is 1. IE: convert to vol frac
-    hists = utility.count_to_volfrac(hists)
+    if to_volfrac:
+        hists = utility.count_to_volfrac(hists)
 
     return hists
 
-def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='smoothed'):
+def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='smoothed',to_volfrac=True):
     # f is a trajectory or a trajectory frame
     # system is a SystemSpec object describing the topology and composition of the system
     # nBins is the number of bins to use to compute the density
     # axis is the axis to plot the density along. Density effectively averaged over the other two.
 
-    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+    if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
         func = lambda t: density_1D_species(t, system, nBins=nBins, axis=axis, method=method)
         return ts, list(map(func, f))
@@ -94,7 +94,8 @@ def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='
             hists[type] = utility.binned_density_1D(coords, box, axis, nBins)
     
     # modify histograms so that sum over species in each bin is 1. IE: convert to vol frac
-    hists = utility.count_to_volfrac(hists)
+    if to_volfrac:
+        hists = utility.count_to_volfrac(hists)
     
     return hists
 
