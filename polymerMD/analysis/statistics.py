@@ -100,6 +100,8 @@ def get_independent_samples(A,factor=1):
 
     # compute number of samples
     nsamples = num_independent_samples(A)/factor
+    if nsamples > np.shape(A)[0]:
+        nsamples = np.shape(A)[0]
     samplesize = int(np.shape(A)[0]/nsamples)
     samples = np.array([np.mean(A[i*samplesize:(i+1)*samplesize]) for i in range(int(nsamples))])
 
