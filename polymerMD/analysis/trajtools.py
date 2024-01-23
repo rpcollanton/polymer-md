@@ -42,7 +42,7 @@ def density_1D_monomers(f, nBins=100, axis=0, method='smoothed',to_volfrac=True)
     # axis is the axis to plot the density along. averaged over other two
     if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
-        func = lambda t: density_1D_monomers(t, nBins=nBins, axis=axis, to_volfrac=to_volfrac)
+        func = lambda t: density_1D_monomers(t, nBins=nBins, axis=axis, method=method, to_volfrac=to_volfrac)
         return ts, list(map(func, f))
 
     box = f.configuration.box[0:3]
@@ -73,7 +73,7 @@ def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='
 
     if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
-        func = lambda t: density_1D_species(t, system, nBins=nBins, axis=axis, method=method)
+        func = lambda t: density_1D_species(t, system, nBins=nBins, axis=axis, method=method, to_volfrac=to_volfrac)
         return ts, list(map(func, f))
 
     # get geometric information
