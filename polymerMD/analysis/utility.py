@@ -93,7 +93,7 @@ def smoothed_density_1D(coord, box, axis, nBins, width=None):
         elif xbins[i] <= 0:
             xpbc[i] = xbins[i]+box[axis]
     for dist in dists:
-        dens += dist.pdf(xpbc[:-1])/nparticles
+        dens += dist.pdf(xpbc[:-1])/nparticles # distributions evaluated in an adjacent mirror box, added into the primary box
         
 
     return (dens,xbins) # tuple to be consistent with binned density histograms
