@@ -27,7 +27,7 @@ def getBondedClusters(snapshot):
 def density_system(f):
     # f is a trajectory or trajectory frame
     
-    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+    if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
         return ts, list(map(density_system, f))
     
@@ -82,11 +82,11 @@ def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='
     # note: should optimize in future because this does not take advantage of the fact that system
     # topology is not changing from frame to frame! will recompute system labels/indices every time
     types = list(set(system.componentlabels)) # some components might have same label. Treat them as identical
-    particleSpeciesTypes = np.array([types.index(type) for type in system.particleSpeciesTypes()])
+    particleSpeciesTypeID = np.array([types.index(type) for type in system.particleSpeciesTypes()])
 
     hists = {}
     for i,type in enumerate(types):
-        mask = particleSpeciesTypes==i
+        mask = particleSpeciesTypeID==i
         coords = f.particles.position[mask,:]
         if method=='smoothed':
             hists[type] = utility.smoothed_density_1D(coords, box, axis, nBins)
@@ -101,7 +101,7 @@ def density_1D_species(f, system: systemspec.System, nBins=100, axis=0, method='
 
 def density_1D_lowest(f, nBins = 100, nLowest=10, axis=0, method='smoothed'):
 
-    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+    if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
         func = lambda t: density_1D_lowest(t, nBins=nBins, nLowest=nLowest, axis=axis, method=method)
         return ts, list(map(func, f))
@@ -123,7 +123,7 @@ def density_1D_lowest(f, nBins = 100, nLowest=10, axis=0, method='smoothed'):
 
 def internaldistances_all(f):
 
-    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+    if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
         func = lambda t: internaldistances_all(t)
         return ts, list(map(func, f))
@@ -141,7 +141,7 @@ def internaldistances_all(f):
 
 def internaldistances_species(f, system: systemspec.System):
 
-    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+    if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
         func = lambda t: internaldistances_species(t, system)
         return ts, list(map(func, f))
@@ -168,7 +168,7 @@ def internaldistances_species(f, system: systemspec.System):
 
 def lineardistancesfromjunctions(f, system: systemspec.System):
 
-    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+    if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
         func = lambda t: lineardistancesfromjunctions(t, system)
         return ts, list(map(func, f))
@@ -242,7 +242,7 @@ def lineardistancesfromjunctions(f, system: systemspec.System):
 
 def endToEndVectors(f, system: systemspec.System):
 
-    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+    if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
         func = lambda t: endToEndVectors(t, system=system)
         return ts, list(map(func, f))
@@ -261,9 +261,9 @@ def endToEndVectors(f, system: systemspec.System):
     
     return vecs
 
-def volfrac_fields(f, nBins=None, density_type='binned'):
+def volfrac_fields(f, nBins=None, density_type='binned',to_volfrac=True):
 
-    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+    if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
         func = lambda t: volfrac_fields(t, nBins=nBins) # to pass non-iterable argument
         return ts, list(map(func, f))
@@ -290,19 +290,53 @@ def volfrac_fields(f, nBins=None, density_type='binned'):
             hists[type] = utility.gaussian_density_ND(coords, box, N=3, nBins=nBins)
 
     # convert to "volume fractions"
-    volfracs = utility.count_to_volfrac(hists)
+    if to_volfrac:
+        hists = utility.count_to_volfrac(hists)
 
-    return volfracs
+    return hists
 
-def exchange_average(f, nBins=None,density_type='binned'):
+def volfrac_fields_species(f, system, nBins=None, density_type='binned',to_volfrac=True):
 
-    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+    if not isinstance(f, gsd.hoomd.Frame):
+        ts = [f[i].configuration.step for i in range(len(f))]
+        func = lambda t: volfrac_fields_species(t, system, nBins, density_type, to_volfrac) # to pass non-iterable argument
+        return ts, list(map(func, f))
+
+    # f is a frame of a trajectory (a snapshot)
+    box = f.configuration.box[0:3]
+    types = list(set(system.componentlabels)) # some components might have same label. Treat them as identical
+    particleSpeciesTypeID = np.array([types.index(type) for type in system.particleSpeciesTypes()])
+
+    if nBins == None:
+        # determine number of bins based on number of particles
+        nParticles = f.particles.N
+        nBins = int(0.5 * nParticles**(1/3))
+
+    # compute 3D binned density functions for each particle type
+    hists = {}
+    for i,type in enumerate(types):
+        mask = particleSpeciesTypeID==i
+        coords = f.particles.position[mask,:]
+        if density_type=='binned':
+            hists[type] = utility.binned_density_ND(coords, box, N=3, nBins=nBins)
+        elif density_type=='gaussian':
+            hists[type] = utility.gaussian_density_ND(coords, box, N=3, nBins=nBins)
+
+    # convert to "volume fractions"
+    if to_volfrac:
+        hists = utility.count_to_volfrac(hists)
+
+    return hists
+
+def exchange_average(f, nBins=None, density_type='binned'):
+
+    if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
         func = lambda t: exchange_average(t, nBins=nBins) # to pass non-iterable argument
         return ts, list(map(func, f))
 
     # f is a frame of a trajectory (a snapshot)
-    volfracs = volfrac_fields(f, nBins,density_type=density_type)
+    volfracs = volfrac_fields(f, nBins, density_type=density_type)
 
     # Specific to an A-B System! Exchange field, psi order parameter in Kremer/Grest 1996
     exchange = volfracs['A'][0] - volfracs['B'][0]
@@ -312,15 +346,15 @@ def exchange_average(f, nBins=None,density_type='binned'):
 
     return avg_exchange
 
-def overlap_integral(f, nBins=None):
+def overlap_integral(f, nBins=None, density_type='binned'):
 
-    if isinstance(f, gsd.hoomd.HOOMDTrajectory):
+    if not isinstance(f, gsd.hoomd.Frame):
         ts = [f[i].configuration.step for i in range(len(f))]
         func = lambda t: overlap_integral(t, nBins=nBins) # to pass non-iterable argument
         return ts, list(map(func, f))
 
     # f is a frame of a trajectory (a snapshot)
-    volfracs = volfrac_fields(f, nBins)
+    volfracs = volfrac_fields(f, nBins, density_type=density_type)
     types = list(volfracs.keys())
     nTypes = len(types)
 
@@ -334,6 +368,55 @@ def overlap_integral(f, nBins=None):
             overlaps[j,i] = overlaps[i,j]
 
     return overlaps
+
+def overlap_integral_species(f, system, nBins=None, density_type='binned',to_volfrac=True):
+
+    if not isinstance(f, gsd.hoomd.Frame):
+        ts = [f[i].configuration.step for i in range(len(f))]
+        func = lambda t: overlap_integral_species(t, system, nBins, density_type, to_volfrac) # to pass non-iterable argument
+        return ts, list(map(func, f))
+
+    # f is a frame of a trajectory (a snapshot)
+    volfracs = volfrac_fields_species(f, system, nBins, density_type=density_type,to_volfrac=to_volfrac)
+    types = list(volfracs.keys())
+    nTypes = len(types)
+
+    # for each function, compute overlap integral.  
+    x = volfracs[types[0]][1] # get coordinates of samples. Should be same for different particle types in same frame with same number of bins
+    overlaps = np.zeros((nTypes,nTypes))
+    for i in range(nTypes):
+        for j in range(i, nTypes):
+            dat = np.multiply(volfracs[types[i]][0], volfracs[types[j]][0])
+            overlaps[i,j] = utility.integral_ND( dat, x, N=3 )
+            overlaps[j,i] = overlaps[i,j]
+
+    return overlaps, types
+
+def overlap_integral_species_normalized(f, system, nBins=None, density_type='binned',to_volfrac=True):
+
+    if not isinstance(f, gsd.hoomd.Frame):
+        ts = [f[i].configuration.step for i in range(len(f))]
+        func = lambda t: overlap_integral_species_normalized(t, system, nBins, density_type, to_volfrac) # to pass non-iterable argument
+        return ts, list(map(func, f))
+
+    # f is a frame of a trajectory (a snapshot)
+    volfracs = volfrac_fields_species(f, system, nBins, density_type=density_type,to_volfrac=to_volfrac)
+    types = list(volfracs.keys())
+    nTypes = len(types)
+
+    # for each function, compute overlap integral.  
+    x = volfracs[types[0]][1] # get coordinates of samples. Should be same for different particle types in same frame with same number of bins
+    overlaps = np.zeros((nTypes,nTypes))
+    for i in range(nTypes):
+        Ii = utility.integral_ND(volfracs[types[i]][0], x, N=3)
+        for j in range(i, nTypes):
+            Ij = utility.integral_ND(volfracs[types[j]][0], x, N=3)
+            dat = np.multiply(volfracs[types[i]][0], volfracs[types[j]][0])
+            overlaps[i,j] = utility.integral_ND( dat, x, N=3 )/(Ii*Ij)**(1/2)
+            overlaps[j,i] = overlaps[i,j]
+
+    return overlaps, types
+
 
 def junction_RDF(f, system:systemspec.System, axis, nBins=40, rmax = 5):
     # get junction centers

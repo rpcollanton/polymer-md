@@ -111,12 +111,19 @@ def binned_density_ND(coord, box, N, nBins):
     return h
 
 def gaussian_density_ND(coord, box, N, nBins,sigma=2**(1/6)):
-    cutoff = np.amax(box)/3
+    cutoff = sigma*5
     gd = freud.density.GaussianDensity(nBins,cutoff,sigma)
+    print("starting gd compute")
     gd.compute((box,coord))
+    print("moving on from gd compute")
 
     boxrange = [(0-box[d]/2, 0+box[d]/2) for d in range(N)]
-    bins = [np.linspace(boxrange[d][0],boxrange[d][1],nBins+1) for d in range(N)]
+    if isinstance(nBins,int):
+        bins = [np.linspace(boxrange[d][0],boxrange[d][1],nBins+1) for d in range(N)]
+    elif hasattr(nBins,'__iter__'):
+        if len(nBins) != N:
+            print("If passing a single number of bins for every dimension, don't pass in as an iterable!")
+        bins = [np.linspace(boxrange[d][0],boxrange[d][1],nBins[d]+1) for d in range(N)]
     h = (gd.density, bins)
 
     return h
